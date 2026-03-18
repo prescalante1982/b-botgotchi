@@ -2,128 +2,123 @@ import pygame
 import json
 import os
 import random
-from utils import obtener_dato_curioso, generar_laberinto, obtener_chiste
+from utils import obtener_dato_curioso, obtener_chiste
 
-# --- CONFIGURACIÓN DE PERSISTENCIA ---
+# --- PALETA DE COLORES B-BOT ---
+COLOR_CUERPO = (245, 245, 245)
+COLOR_PANTALLA = (25, 25, 30)
+COLOR_LED = (0, 255, 255)
+COLOR_LED_GLOW = (180, 255, 255)
+COLOR_FONDO = (35, 35, 45)
+
 CONFIG_FILE = "config.json"
-DATA_INICIAL = {
-    "nombre": "Mateo",
-    "edad": 7,
-    "gustos": ["espacio", "dinosaurios", "robots"],
-    "nivel": 1,
-    "xp": 0
-}
 
-def cargar_datos():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r') as f:
-            try:
-                return json.load(f)
-            except:
-                return DATA_INICIAL
-    return DATA_INICIAL
-
-def guardar_datos(datos):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(datos, f)
-
-# --- CLASE PRINCIPAL DEL B-BOT ---
 class BBotApp:
     def __init__(self):
         pygame.init()
-        # Resolución optimizada para pantallas de Raspberry Pi
-        self.screen = pygame.display.set_mode((800, 480))
+        # Ajuste a 800x400 con Fullscreen y Scaled para evitar distorsión
+        self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
         pygame.display.set_caption("B-Botgotchi OS")
         self.clock = pygame.time.Clock()
         
-        # Cargar progreso de Mateo
-        self.datos = cargar_datos()
-        
-        # Inicialización de Controles (8BitDo SNES30 + USB Genérico)
+        # Cargar datos persistentes
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f: self.datos = json.load(f)
+        else:
+            self.datos = {"nombre": "Mateo", "nivel": 1, "xp": 0, "gustos": ["robots", "espacio"]}
+
+        # Inicialización de Joysticks
         pygame.joystick.init()
         self.joysticks = [pygame.joystick.Joystick(x) for x in range(pygame.joystick.get_count())]
-        for j in self.joysticks:
-            j.init()
-            print(f"Control conectado: {j.get_name()}")
+        for j in self.joysticks: j.init()
 
-        # Estados del Sistema
-        self.estado = "MENU" # MENU, JUEGO, DATO
         self.mood = "feliz"
-        self.texto = f"¡Hola {self.datos['nombre']}! A para Dato, B para Loco."
+        self.texto = f"¡Hola {self.datos['nombre']}! Presiona A para un dato."
         self.running = True
 
-    def dibujar_interfaz(self):
-        """Renderiza al B-Bot con estética Pixel Art y animaciones."""
-        self.screen.fill((10, 10, 10)) # Fondo Negro
+    def dibujar_bbot(self):
+        self.screen.fill(COLOR_FONDO)
         
-        # Color de la interfaz según el humor
-        color_led = (0, 255, 255) if self.mood != "loco" else (255, 100, 255)
+        # 1. CUERPO CILÍNDRICO (Centrado y ajustado a 400px de alto)
+        # Sombra lateral para profundidad
+        pygame.draw.rect(self.screen, (210, 210, 215), (285, 30, 230, 270), border_radius=55)
+        # Chasis principal
+        pygame.draw.rect(self.screen, COLOR_CUERPO, (290, 25, 220, 260), border_radius=55)
         
-        # Cuerpo del B-Bot (Estilo Ron's Gone Wrong)
-        # Rectángulo redondeado blanco
-        pygame.draw.rect(self.screen, (235, 235, 235), (280, 60, 240, 320), border_radius=25)
+        # 2. PANTALLA DIGITAL (El "visor")
+        pygame.draw.rect(self.screen, COLOR_PANTALLA, (315, 65, 170, 100), border_radius=15)
+
+        # 3. OJOS LED CON ANIMACIÓN
+        tiempo = pygame.time.get_ticks()
+        pestañeo = tiempo % 4500 < 150 # Pestañea cada 4.5 segundos
         
-        # Animación de Pestañeo: Cada 4 segundos cierra los ojos brevemente
-        tiempo_actual = pygame.time.get_ticks()
-        pestañeando = tiempo_actual % 4000 < 200
-        
-        if not pestañeando:
-            # Ojos Pixel Art (Cuadrados)
-            pygame.draw.rect(self.screen, color_led, (330, 140, 40, 40)) # Ojo L
-            pygame.draw.rect(self.screen, color_led, (430, 140, 40, 40)) # Ojo R
-        
-        # Boca dinámica
+        if not pestañeo:
+            color = COLOR_LED if self.mood != "loco" else (255, 80, 255)
+            # Ojo Izquierdo
+            pygame.draw.rect(self.screen, COLOR_LED_GLOW, (345, 95, 25, 25)) 
+            pygame.draw.rect(self.screen, color, (345, 95, 25, 25), 3)
+            # Ojo Derecho
+            pygame.draw.rect(self.screen, COLOR_LED_GLOW, (430, 95, 25, 25))
+            pygame.draw.rect(self.screen, color, (430, 95, 25, 25), 3)
+
+        # 4. EXPRESIONES DE BOCA
         if self.mood == "feliz":
-            pygame.draw.rect(self.screen, color_led, (360, 260, 80, 10))
+            pygame.draw.rect(self.screen, COLOR_LED, (370, 210, 60, 6), border_radius=3)
         elif self.mood == "loco":
-            # Efecto de boca "pixelada" abierta
-            pygame.draw.rect(self.screen, color_led, (370, 250, 60, 30), 3)
+            pygame.draw.rect(self.screen, (255, 80, 255), (375, 200, 50, 25), 2)
 
-        # Renderizado de Texto de información
-        font = pygame.font.SysFont("monospace", 18, bold=True)
-        # Dividir texto si es muy largo para que quepa en pantalla
-        txt_display = self.texto[:70] + "..." if len(self.texto) > 70 else self.texto
-        img_txt = font.render(txt_display, True, (255, 255, 255))
-        self.screen.blit(img_txt, (50, 420))
+        # 5. BURBUJA DE TEXTO (Ajustada para no cortarse abajo)
+        pygame.draw.rect(self.screen, (255, 255, 255), (50, 310, 700, 70), border_radius=15)
         
-        # Indicador de Nivel y XP
-        lvl_txt = font.render(f"LVL: {self.datos['nivel']} | XP: {self.datos['xp']}/50", True, (0, 255, 0))
-        self.screen.blit(lvl_txt, (550, 20))
+        # Fuente y Renderizado
+        font = pygame.font.SysFont("monospace", 16, bold=True)
+        txt_wrapped = self.texto[:85] + "..." if len(self.texto) > 85 else self.texto
+        txt_surf = font.render(txt_wrapped, True, (40, 40, 45))
+        self.screen.blit(txt_surf, (75, 335))
 
-    def check_evolucion(self):
-        """Lógica para subir de nivel a Mateo."""
-        if self.datos["xp"] >= 50:
-            self.datos["nivel"] += 1
-            self.datos["xp"] = 0
-            self.texto = f"¡NIVEL SUBIDO! Ahora eres Nivel {self.datos['nivel']}"
-            guardar_datos(self.datos)
+        # Indicador de Nivel (Esquina superior)
+        lvl_font = pygame.font.SysFont("monospace", 14, bold=True)
+        lvl_txt = lvl_font.render(f"LVL {self.datos['nivel']} | XP {self.datos['xp']}/50", True, (200, 255, 200))
+        self.screen.blit(lvl_txt, (20, 20))
+
+    def guardar_progreso(self):
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(self.datos, f)
 
     def run(self):
         while self.running:
-            self.dibujar_interfaz()
+            self.dibujar_bbot()
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                 
-                # Manejo de Inputs de Joystick
+                # Salir con ESCAPE
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE: self.running = False
+                
+                # Inputs de Joystick (8BitDo / USB)
                 if event.type == pygame.JOYBUTTONDOWN:
-                    # BOTÓN A (Generalmente botón 0): Obtener Dato/Chiste
-                    if event.button == 0:
-                        self.mood = "feliz"
+                    if event.button == 0: # BOTÓN A
                         self.texto = obtener_dato_curioso(self.datos)
+                        self.mood = "feliz"
                         self.datos["xp"] += 10
-                        self.check_evolucion()
-                        guardar_datos(self.datos)
-                    
-                    # BOTÓN B (Generalmente botón 1): Modo Loco / Baile
-                    if event.button == 1:
-                        self.mood = "loco"
+                        if self.datos["xp"] >= 50:
+                            self.datos["nivel"] += 1
+                            self.datos["xp"] = 0
+                        self.guardar_progreso()
+                        
+                    if event.button == 1: # BOTÓN B
                         self.texto = obtener_chiste()
-            
+                        self.mood = "loco"
+                    
+                    if event.button == 7: # BOTÓN START (Común en mandos)
+                        self.running = False
+
             pygame.display.flip()
-            self.clock.tick(30) # 30 FPS para ahorrar recursos en la Pi 3B
+            self.clock.tick(30)
 
 if __name__ == "__main__":
     app = BBotApp()
     app.run()
+    pygame.quit()
