@@ -2,16 +2,15 @@ import pygame
 import json
 import os
 import time
+import math
 from utils import obtener_dato_curioso, obtener_chiste, generar_laberinto
 
-# --- COLORES DIVERTIDOS ---
-COLOR_PARED = (80, 80, 150)
-COLOR_CAMINO = (220, 220, 250)
-COLOR_META = (255, 215, 0)
-COLOR_PABLO = (0, 255, 150)
+# --- COLORES ---
+COLOR_VIVO = (0, 255, 200)
+COLOR_SUEÑO = (100, 100, 255)
 COLOR_FONDO = (60, 60, 90)
 
-class BBotGame:
+class BBotVivo:
     def __init__(self):
         pygame.init()
         pygame.joystick.init()
@@ -19,100 +18,112 @@ class BBotGame:
         self.clock = pygame.time.Clock()
         
         self.stats = {"hambre": 100, "energia": 100, "diversion": 100}
-        self.datos = {"nombre": "Pablo Ali"}
+        self.estado = "IDLE" # IDLE, BAILANDO, DURMIENDO, LABERINTO
+        self.texto = "¡HOLA PABLO ALI! ¡DAME UN ABRAZO!"
         
-        # Reconocer mandos
+        # Configuración de controles
         self.controles = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
         for j in self.controles: j.init()
 
-        self.estado = "BOT"
-        self.texto = "¡HOLA PABLO ALI! VAMOS A JUGAR"
-        self.pos_pablo = [0, 0]
-        self.mapa = []
+        self.offset_y = 0  # Para el salto del baile
+        self.angulo = 0    # Para el balanceo
         self.running = True
 
-    def iniciar_juego(self):
-        self.estado = "LABERINTO"
-        self.mapa = generar_laberinto(8) # Laberinto más pequeño (8x8) para que no sea difícil
-        self.pos_pablo = [0, 0]
-        self.texto = "¡USA LAS FLECHAS PARA LLEGAR AL ORO!"
+    def actualizar_animacion(self):
+        t = pygame.time.get_ticks()
+        
+        # 1. LÓGICA DE BAILE (Salto y rotación)
+        if self.estado == "BAILANDO":
+            self.offset_y = math.sin(t * 0.01) * 20 # Salta arriba y abajo
+            self.angulo = math.sin(t * 0.01) * 10   # Se balancea
+            if t % 3000 < 50: self.estado = "IDLE"  # Deja de bailar tras unos segundos
+        
+        # 2. LÓGICA DE SUEÑO
+        elif self.stats["energia"] < 30:
+            self.estado = "DURMIENDO"
+            self.offset_y = math.sin(t * 0.002) * 5 # Respiración lenta
+        
+        else:
+            self.estado = "IDLE"
+            self.offset_y = 0
+            self.angulo = 0
 
-    def dibujar_laberinto(self):
-        self.screen.fill((40, 40, 60))
-        tam = 40
-        ox, oy = 240, 40 # Centrado en la pantalla
+    def dibujar_ojos(self, cx, cy, color):
+        t = pygame.time.get_ticks()
         
-        for f in range(len(self.mapa)):
-            for c in range(len(self.mapa[f])):
-                color = COLOR_PARED if self.mapa[f][c] == 1 else COLOR_CAMINO
-                if f == 7 and c == 7: color = COLOR_META
-                pygame.draw.rect(self.screen, color, (ox + c*tam, oy + f*tam, tam-4, tam-4), border_radius=8)
+        if self.estado == "DURMIENDO":
+            # Ojos cerrados: - -
+            pygame.draw.rect(self.screen, COLOR_SUEÑO, (cx-55, cy+105+self.offset_y, 30, 5))
+            pygame.draw.rect(self.screen, COLOR_SUEÑO, (cx+25, cy+105+self.offset_y, 30, 5))
+            # Letras ZzZ
+            font_z = pygame.font.SysFont("Arial", 25, bold=True)
+            if t % 1000 < 500:
+                self.screen.blit(font_z.render("ZzZ", True, (255, 255, 255)), (cx+80, cy+50+self.offset_y))
         
-        # Pablo Alí es una estrella en el laberinto
-        pygame.draw.circle(self.screen, COLOR_PANTALLA_Luz, (ox + self.pos_pablo[1]*tam + 18, oy + self.pos_pablo[0]*tam + 18), 15)
+        elif self.estado == "BAILANDO":
+            # Ojos de estrella o alegría: ^ ^
+            pygame.draw.lines(self.screen, color, False, [(cx-50, cy+110+self.offset_y), (cx-35, cy+95+self.offset_y), (cx-20, cy+110+self.offset_y)], 4)
+            pygame.draw.lines(self.screen, color, False, [(cx+20, cy+110+self.offset_y), (cx+35, cy+95+self.offset_y), (cx+50, cy+110+self.offset_y)], 4)
         
-        font = pygame.font.SysFont("FreeSans", 22, bold=True)
-        txt_surf = font.render(self.texto, True, (255, 255, 255))
-        self.screen.blit(txt_surf, (150, 365))
-
-    def mover(self, df, dc):
-        nf, nc = self.pos_pablo[0] + df, self.pos_pablo[1] + dc
-        if 0 <= nf < 8 and 0 <= nc < 8 and self.mapa[nf][nc] == 0:
-            self.pos_pablo = [nf, nc]
-            if nf == 7 and nc == 7:
-                self.estado = "BOT"
-                self.texto = "¡ERES UN CAMPEON PABLO ALI!"
-                self.stats["diversion"] = 100
+        else:
+            # Ojos normales con parpadeo
+            if not (t % 4000 < 150):
+                pygame.draw.circle(self.screen, color, (cx-40, cy+110+self.offset_y), 20)
+                pygame.draw.circle(self.screen, color, (cx+40, cy+110+self.offset_y), 20)
+                pygame.draw.circle(self.screen, (255, 255, 255), (cx-40, cy+110+self.offset_y), 8)
+                pygame.draw.circle(self.screen, (255, 255, 255), (cx+40, cy+110+self.offset_y), 8)
 
     def dibujar_bbot(self):
         self.screen.fill(COLOR_FONDO)
-        # Cuerpo y Ojos (Diseño amigable)
-        pygame.draw.rect(self.screen, (255, 255, 255), (300, 30, 200, 240), border_radius=60)
-        pygame.draw.circle(self.screen, (0, 200, 255), (360, 110), 22)
-        pygame.draw.circle(self.screen, (0, 200, 255), (440, 110), 22)
+        cx, cy = 400, 25
         
-        # Caja de texto limpia
-        pygame.draw.rect(self.screen, (255, 255, 255), (50, 290, 700, 90), border_radius=20)
-        font = pygame.font.SysFont("FreeSans", 24, bold=True)
-        txt_render = font.render(self.texto.upper(), True, (50, 50, 80))
-        self.screen.blit(txt_render, (80, 320))
+        # Sombra en el piso
+        pygame.draw.ellipse(self.screen, (40, 40, 70), (300, 270, 200, 30))
+        
+        # Cuerpo (Cápsula blanca)
+        pygame.draw.rect(self.screen, (255, 255, 255), (310, cy+self.offset_y, 180, 240), border_radius=60)
+        
+        # Pantalla de la cara
+        pygame.draw.rect(self.screen, (20, 20, 25), (330, cy+50+self.offset_y, 140, 80), border_radius=15)
+        
+        # Dibujar Ojos dinámicos
+        color_ojos = COLOR_VIVO if self.estado != "DURMIENDO" else COLOR_SUEÑO
+        self.dibujar_ojos(cx, cy, color_ojos)
+
+        # Burbuja de texto
+        pygame.draw.rect(self.screen, (255, 255, 255), (50, 300, 700, 80), border_radius=20)
+        font = pygame.font.SysFont("FreeSans", 22, bold=True)
+        self.screen.blit(font.render(self.texto.upper(), True, (50, 50, 80)), (80, 330))
 
     def run(self):
         while self.running:
-            if self.estado == "BOT": self.dibujar_bbot()
-            else: self.dibujar_laberinto()
+            self.actualizar_animacion()
+            self.dibujar_bbot()
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: self.running = False
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.running = False
                 
-                # BOTONES
                 if event.type == pygame.JOYBUTTONDOWN:
-                    if event.button == 0: # A: Aprender
-                        self.estado = "BOT"
-                        self.texto = obtener_dato_curioso(self.datos)
-                    elif event.button == 1: # B: Reír
-                        self.estado = "BOT"
+                    if event.button == 0: # A: COMER
+                        self.estado = "BAILANDO"
+                        self.stats["hambre"] = 100
+                        self.texto = "¡QUE RICO! ¡GRACIAS PABLO ALI!"
+                    
+                    elif event.button == 1: # B: CHISTE
+                        self.estado = "BAILANDO"
                         self.texto = obtener_chiste()
-                    elif event.button in [2, 3]: # X/Y: Jugar
-                        self.iniciar_juego()
-
-                # MOVIMIENTO UNIVERSAL (Hats y Ejes)
-                if self.estado == "LABERINTO":
-                    if event.type == pygame.JOYHATMOTION:
-                        hx, hy = event.value
-                        if hx != 0: self.mover(0, hx)
-                        if hy != 0: self.mover(-hy, 0)
-                    if event.type == pygame.JOYAXISMOTION:
-                        if event.axis == 0 and abs(event.value) > 0.5: self.mover(0, 1 if event.value > 0 else -1)
-                        if event.axis == 1 and abs(event.value) > 0.5: self.mover(1 if event.value > 0 else -1, 0)
+                    
+                    elif event.button in [2, 3]: # X/Y: DORMIR O DESPERTAR
+                        if self.stats["energia"] < 50:
+                            self.stats["energia"] = 100
+                            self.texto = "¡YA DESPERTE! ¡A JUGAR!"
+                            self.estado = "BAILANDO"
+                        else:
+                            self.texto = "TENGO UN POQUITO DE SUEÑO..."
 
             pygame.display.flip()
-            self.clock.tick(20)
-
-COLOR_PANTALLA_Luz = (0, 255, 200)
+            self.clock.tick(30)
 
 if __name__ == "__main__":
-    app = BBotGame()
+    app = BBotVivo()
     app.run()
-    pygame.quit()
