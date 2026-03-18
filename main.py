@@ -1,40 +1,131 @@
 import pygame
 import json
-import os
 import time
 import math
+import random
 from utils import obtener_dato_curioso, obtener_chiste, generar_laberinto
 
 # --- COLORES ---
-COLOR_VIVO = (0, 255, 200)
-COLOR_SUEÑO = (100, 100, 255)
+COLOR_MENU = (100, 100, 255)
+COLOR_TEXTO = (255, 255, 255)
 COLOR_FONDO = (60, 60, 90)
+COLOR_VIVO = (0, 255, 200)
 
-class BBotVivo:
+class BBotConsola:
     def __init__(self):
         pygame.init()
         pygame.joystick.init()
         self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
         self.clock = pygame.time.Clock()
         
-        self.stats = {"hambre": 100, "energia": 100, "diversion": 100}
-        self.estado = "IDLE" # IDLE, BAILANDO, DURMIENDO, LABERINTO
-        self.texto = "¡HOLA PABLO ALI! ¡DAME UN ABRAZO!"
+        # Estado del Sistema: "MENU", "JUEGO", "MASCOTA", "CHISTES", "CUENTOS"
+        self.modo = "MENU"
+        self.texto = "¡HOLA PABLO ALI! ¿QUE HACEMOS?"
         
-        # Configuración de controles
         self.controles = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
         for j in self.controles: j.init()
 
-        self.offset_y = 0  # Para el salto del baile
-        self.angulo = 0    # Para el balanceo
+        self.ultima_accion = time.time()
+        self.offset_y = 0
         self.running = True
 
-    def actualizar_animacion(self):
+    def dibujar_menu(self):
+        self.screen.fill(COLOR_FONDO)
+        font_titulo = pygame.font.SysFont("Arial", 30, bold=True)
+        font_opcion = pygame.font.SysFont("Arial", 22, bold=True)
+
+        # Título
+        self.screen.blit(font_titulo.render("MENU DEL B-BOT", True, COLOR_VIVO), (280, 40))
+
+        # Opciones con botones
+        opciones = [
+            "1. JUGAR LABERINTO",
+            "2. CUIDAR MASCOTA",
+            "3. ESCUCHAR CHISTES",
+            "4. LEER UN CUENTO"
+        ]
+        for i, opt in enumerate(opciones):
+            pygame.draw.rect(self.screen, (255, 255, 255), (200, 100 + i*60, 400, 45), border_radius=10)
+            txt = font_opcion.render(opt, True, (50, 50, 80))
+            self.screen.blit(txt, (250, 110 + i*60))
+
+        self.screen.blit(font_opcion.render("PRESIONA START PARA SALIR", True, (200, 200, 200)), (250, 350))
+
+    def dibujar_cuento(self):
+        self.screen.fill((50, 20, 50))
+        cuentos = [
+            "HABIA UNA VEZ UN ROBOT QUE QUERIA SER GUITARRISTA...",
+            "UN DRAGON VERDE QUE SOLO COMIA MANZANAS AZULES.",
+            "EL ASTRONAUTA QUE ENCONTRO UN QUESO EN LA LUNA.",
+            "UN PERRO QUE PODIA VOLAR USANDO SUS OREJAS."
+        ]
+        font = pygame.font.SysFont("Arial", 22, bold=True)
+        # Mostramos el cuento centrado
+        txt = font.render(self.texto, True, (255, 255, 255))
+        self.screen.blit(txt, (50, 180))
+        self.screen.blit(font.render("PULSA CUALQUIER BOTON PARA VOLVER", True, (150, 150, 150)), (220, 350))
+
+    def dibujar_animacion_espera(self):
+        # Si no hace nada, el B-Bot baila solo
+        self.screen.fill(COLOR_FONDO)
         t = pygame.time.get_ticks()
+        self.offset_y = math.sin(t * 0.01) * 15
         
-        # 1. LÓGICA DE BAILE (Salto y rotación)
-        if self.estado == "BAILANDO":
-            self.offset_y = math.sin(t * 0.01) * 20 # Salta arriba y abajo
+        # Dibujo rápido del robot bailando
+        pygame.draw.rect(self.screen, (255, 255, 255), (320, 100 + self.offset_y, 160, 200), border_radius=50)
+        pygame.draw.circle(self.screen, COLOR_VIVO, (360, 160 + self.offset_y), 15)
+        pygame.draw.circle(self.screen, COLOR_VIVO, (440, 160 + self.offset_y), 15)
+        
+        font = pygame.font.SysFont("Arial", 22, bold=True)
+        txt = font.render(self.texto.upper(), True, (255, 255, 255))
+        self.screen.blit(txt, (100, 330))
+
+    def run(self):
+        while self.running:
+            ahora = time.time()
+            
+            # LÓGICA DE INACTIVIDAD (10 segundos)
+            if ahora - self.ultima_accion > 10 and self.modo == "MENU":
+                if ahora % 5 < 0.05: # Cambia de dato cada 5 segundos
+                    self.texto = "SABIAS QUE: " + obtener_dato_curioso({"gustos":[]})
+                self.dibujar_animacion_espera()
+            else:
+                if self.modo == "MENU": self.dibujar_menu()
+                elif self.modo == "CUENTOS": self.dibujar_cuento()
+                # Aquí irían los otros dibujos (laberinto, mascota, etc.)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.running = False
+                
+                if event.type == pygame.JOYBUTTONDOWN:
+                    self.ultima_accion = time.time() # Reset de tiempo
+                    
+                    # BOTONES DEL MENU
+                    if self.modo == "MENU":
+                        if event.button == 0: # Botón 1: Laberinto
+                            self.modo = "JUEGO"
+                            self.texto = "¡CARGANDO LABERINTO!"
+                        elif event.button == 1: # Botón 2: Mascota
+                            self.modo = "MASCOTA"
+                            self.texto = "¡HOLA! TENGO HAMBRE"
+                        elif event.button == 2: # Botón 3: Chistes
+                            self.modo = "CHISTES"
+                            self.texto = obtener_chiste()
+                        elif event.button == 3: # Botón 4: Cuentos
+                            self.modo = "CUENTOS"
+                            self.texto = "HABIA UNA VEZ UN ROBOT QUE JUGABA CON PABLO..."
+                    
+                    # VOLVER AL MENU (Botón Select/Start o un botón específico)
+                    elif event.button in [6, 7, 8, 9]: 
+                        self.modo = "MENU"
+                        self.texto = "¿QUE HACEMOS AHORA?"
+
+            pygame.display.flip()
+            self.clock.tick(30)
+
+if __name__ == "__main__":
+    app = BBotConsola()
+    app.run()            self.offset_y = math.sin(t * 0.01) * 20 # Salta arriba y abajo
             self.angulo = math.sin(t * 0.01) * 10   # Se balancea
             if t % 3000 < 50: self.estado = "IDLE"  # Deja de bailar tras unos segundos
         
