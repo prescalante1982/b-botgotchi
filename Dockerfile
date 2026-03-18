@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiamos el código fuente
 COPY . .
-
+ENV PYGAME_DETECT_AVX2=1
+ENV SDL_VIDEODRIVER=dummy
 # Comando para ejecutar la aplicación
 CMD ["python", "main.py"]
