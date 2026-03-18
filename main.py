@@ -1,112 +1,131 @@
 import pygame
 import json
 import os
-import random
+import time
 from utils import obtener_dato_curioso, obtener_chiste, generar_laberinto
 
-# --- COLORES ---
-COLOR_CUERPO, COLOR_PANTALLA = (255, 255, 255), (20, 20, 25)
-COLOR_VIVO, COLOR_LOCO, COLOR_FONDO = (0, 255, 200), (255, 50, 150), (60, 60, 90)
+# --- PALETA VINTAGE LCD ---
+COLOR_LCD_FONDO = (155, 188, 15)   # Verde clásico GameBoy
+COLOR_LCD_PIXEL = (15, 56, 15)     # Verde oscuro casi negro
+COLOR_LCD_SHADOW = (139, 172, 15)
 
-class BBotApp:
+CONFIG_FILE = "config.json"
+
+class BBot90s:
     def __init__(self):
         pygame.init()
         pygame.joystick.init()
         self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
         self.clock = pygame.time.Clock()
         
-        self.datos = {"nombre": "Pablo Ali", "nivel": 1, "xp": 0}
+        # Stats estilo Tamagotchi
+        self.stats = {"hambre": 100, "energia": 100, "diversion": 100, "vivo": True}
+        self.datos = {"nombre": "Pablo Ali", "nivel": 1}
+        
         self.controles = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
         for j in self.controles: j.init()
 
-        self.estado = "BOT" # "BOT" o "LABERINTO"
-        self.mood = "feliz"
-        self.texto = "¡HOLA PABLO ALI! PRESIONA X PARA EL LABERINTO"
-        
-        # Variables del Laberinto
-        self.mapa = []
-        self.pos_pablo = [0, 0] # [fila, columna]
+        self.mood = "neutral"
+        self.texto = "¡HOLA PABLO ALI! PIPI-PU-PI!"
+        self.last_tick = time.time()
         self.running = True
 
-    def iniciar_laberinto(self):
-        self.estado = "LABERINTO"
-        self.mapa = generar_laberinto(10) # Crea un laberinto de 10x10
-        self.pos_pablo = [0, 0]
-        self.texto = "¡LLEGA AL FINAL CON LAS FLECHAS!"
+    def actualizar_logica(self):
+        if not self.stats["vivo"]: return
 
-    def dibujar_laberinto(self):
-        self.screen.fill((30, 30, 40))
-        tam_celda = 35
-        offset_x, offset_y = 220, 30
-        
-        for f in range(len(self.mapa)):
-            for c in range(len(self.mapa[f])):
-                color = (100, 100, 120) if self.mapa[f][c] == 1 else (200, 200, 220)
-                # Meta
-                if f == 9 and c == 9: color = (255, 215, 0)
-                
-                pygame.draw.rect(self.screen, color, (offset_x + c*tam_celda, offset_y + f*tam_celda, tam_celda-2, tam_celda-2), border_radius=4)
-        
-        # Dibujar a Pablo (El B-Bot chiquito)
-        pygame.draw.circle(self.screen, COLOR_VIVO, (offset_x + self.pos_pablo[1]*tam_celda + 17, offset_y + self.pos_pablo[0]*tam_celda + 17), 12)
-        
-        # Texto de ayuda abajo
-        font = pygame.font.SysFont("Arial", 22, bold=True)
-        self.screen.blit(font.render(self.texto, True, (255, 255, 255)), (150, 360))
+        # El tiempo pasa... (Degradación rápida estilo 90s)
+        ahora = time.time()
+        if ahora - self.last_tick > 10: # Cada 10 segundos baja el hambre
+            self.stats["hambre"] -= 10
+            self.stats["energia"] -= 5
+            self.stats["diversion"] -= 8
+            self.last_tick = ahora
 
-    def dibujar_bbot(self):
-        self.screen.fill(COLOR_FONDO)
-        pygame.draw.rect(self.screen, COLOR_CUERPO, (300, 25, 200, 250), border_radius=60)
-        pygame.draw.rect(self.screen, COLOR_PANTALLA, (325, 65, 150, 90), border_radius=15)
-        
-        color = COLOR_VIVO if self.mood == "feliz" else COLOR_LOCO
-        pygame.draw.circle(self.screen, color, (360, 110), 20)
-        pygame.draw.circle(self.screen, color, (440, 110), 20)
-        
-        pygame.draw.rect(self.screen, (255, 255, 255), (40, 300, 720, 85), border_radius=20)
-        font = pygame.font.SysFont("Arial", 22, bold=True)
-        self.screen.blit(font.render(self.texto.upper(), True, (40, 40, 70)), (70, 325))
+        # ¿Se murió? :(
+        if self.stats["hambre"] <= 0 or self.stats["energia"] <= 0:
+            self.stats["vivo"] = False
+            self.texto = "OH NO... PRESIONA START PARA REINICIAR"
 
-    def mover(self, df, dc):
-        nf, nc = self.pos_pablo[0] + df, self.pos_pablo[1] + dc
-        if 0 <= nf < 10 and 0 <= nc < 10 and self.mapa[nf][nc] == 0:
-            self.pos_pablo = [nf, nc]
-            if nf == 9 and nc == 9: # Ganó
-                self.estado = "BOT"
-                self.texto = "¡GANASTE PABLO ALI! +20 XP"
-                self.datos["xp"] += 20
+    def dibujar_interfaz_retro(self):
+        self.screen.fill(COLOR_LCD_FONDO)
+        
+        # Dibujar Marco de la pantalla (Borde de plástico de juguete)
+        pygame.draw.rect(self.screen, (50, 50, 50), (10, 10, 780, 380), 15, border_radius=30)
+
+        if not self.stats["vivo"]:
+            # Dibujar Fantasmita Píxel Art
+            self.dibujar_fantasma()
+        else:
+            # 1. ICONOS DE ESTADO (Parpadean si están bajos)
+            self.dibujar_iconos()
+            # 2. EL B-BOT (Píxel Art puro)
+            self.dibujar_bbot_pixel()
+
+        # 3. TEXTO ESTILO LCD (Fuente Monospace)
+        pygame.draw.rect(self.screen, COLOR_LCD_PIXEL, (50, 310, 700, 60), 2)
+        font = pygame.font.SysFont("Courier New", 22, bold=True)
+        txt = font.render(self.texto.upper(), True, COLOR_LCD_PIXEL)
+        self.screen.blit(txt, (70, 330))
+
+    def dibujar_iconos(self):
+        # Hambre (Icono de comida) - Parpadea si < 30
+        if self.stats["hambre"] > 30 or (time.time() * 2) % 2 > 1:
+            pygame.draw.rect(self.screen, COLOR_LCD_PIXEL, (50, 30, 40, 30), 2) # "Hamburguesa"
+        
+        # Sueño (Icono Zzz)
+        if self.stats["energia"] > 30 or (time.time() * 2) % 2 > 1:
+            font = pygame.font.SysFont("Arial", 20, bold=True)
+            self.screen.blit(font.render("Zz", True, COLOR_LCD_PIXEL), (120, 30))
+
+    def dibujar_bbot_pixel(self):
+        # Un diseño más cuadrado y "pixeleado"
+        centro_x, centro_y = 400, 160
+        # Cuerpo
+        pygame.draw.rect(self.screen, COLOR_LCD_PIXEL, (centro_x-70, centro_y-80, 140, 180), 4, border_radius=10)
+        # Visor
+        pygame.draw.rect(self.screen, COLOR_LCD_PIXEL, (centro_x-50, centro_y-60, 100, 60), 2)
+        
+        # Ojos de píxel (Cuadrados)
+        if (time.time() % 4 > 0.2): # Pestañeo
+            pygame.draw.rect(self.screen, COLOR_LCD_PIXEL, (centro_x-35, centro_y-45, 20, 20))
+            pygame.draw.rect(self.screen, COLOR_LCD_PIXEL, (centro_x+15, centro_y-45, 20, 20))
+
+    def dibujar_fantasma(self):
+        font = pygame.font.SysFont("Arial", 50, bold=True)
+        self.screen.blit(font.render("X_X", True, COLOR_LCD_PIXEL), (350, 150))
 
     def run(self):
         while self.running:
-            if self.estado == "BOT": self.dibujar_bbot()
-            else: self.dibujar_laberinto()
+            self.actualizar_logica()
+            self.dibujar_interfaz_retro()
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: self.running = False
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.running = False
                 
-                # BOTONES
                 if event.type == pygame.JOYBUTTONDOWN:
-                    if event.button == 0: # A: Dato
-                        self.estado = "BOT"; self.mood = "feliz"
-                        self.texto = obtener_dato_curioso(self.datos)
-                    elif event.button == 1: # B: Chiste
-                        self.estado = "BOT"; self.mood = "loco"
-                        self.texto = obtener_chiste()
-                    elif event.button in [2, 3]: # X/Y: Laberinto
-                        self.iniciar_laberinto()
+                    # SI ESTÁ MUERTO: Resetear con cualquier botón largo
+                    if not self.stats["vivo"]:
+                        self.__init__()
+                        continue
 
-                # MOVIMIENTO (Flechas / D-Pad)
-                if self.estado == "LABERINTO" and event.type == pygame.JOYHATMOTION:
-                    x, y = event.value # x: -1 izq, 1 der / y: -1 abajo, 1 arriba
-                    if x == 1: self.mover(0, 1)
-                    if x == -1: self.mover(0, -1)
-                    if y == 1: self.mover(-1, 0)
-                    if y == -1: self.mover(1, 0)
+                    # BOTÓN A: Alimentar
+                    if event.button == 0:
+                        self.stats["hambre"] = min(100, self.stats["hambre"] + 25)
+                        self.texto = "¡GLUP! DELICIOSO PABLO ALI"
+                    
+                    # BOTÓN B: Dormir
+                    elif event.button == 1:
+                        self.stats["energia"] = min(100, self.stats["energia"] + 40)
+                        self.texto = "DURMIENDO... NO DESPIERTES"
+                    
+                    # BOTÓN X: Jugar (Laberinto)
+                    elif event.button in [2, 3]:
+                        self.texto = "¡VAMOS AL LABERINTO!"
+                        # Aquí lanzas tu lógica de laberinto
 
             pygame.display.flip()
-            self.clock.tick(30)
+            self.clock.tick(20)
 
 if __name__ == "__main__":
-    app = BBotApp()
+    app = BBot90s()
     app.run()
