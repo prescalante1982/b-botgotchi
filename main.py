@@ -5,42 +5,37 @@ import math
 import random
 from utils import obtener_dato_curioso, obtener_chiste, generar_laberinto
 
-# --- CONFIGURACIÓN Y COLORES ---
+# --- CONFIGURACIÓN ---
 COLOR_FONDO = (60, 60, 90)
 COLOR_VIVO = (0, 255, 200)
-COLOR_TEXTO = (255, 255, 255)
 
 class BBotConsola:
     def __init__(self):
         pygame.init()
         pygame.joystick.init()
-        # Intentar pantalla completa para la Raspberry de Pablo Ali
         try:
             self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
         except:
             self.screen = pygame.display.set_mode((800, 400))
-            
+        
         self.clock = pygame.time.Clock()
         self.modo = "MENU"
         self.texto = "¡HOLA PABLO ALI! ¿QUE HACEMOS?"
+        self.running = True
+        self.pos_pablo = [0, 0]
+        self.mapa = []
         
-        # Inicializar mandos USB/Bluetooth
         self.controles = []
         for i in range(pygame.joystick.get_count()):
             j = pygame.joystick.Joystick(i)
             j.init()
             self.controles.append(j)
 
-        self.ultima_accion = time.time()
-        self.pos_pablo = [0, 0]
-        self.mapa = []
-        self.running = True
-
     def iniciar_laberinto(self):
         self.modo = "JUEGO"
         self.mapa = generar_laberinto(8)
         self.pos_pablo = [0, 0]
-        self.texto = "¡LLEGA AL ORO CON LAS FLECHAS!"
+        self.texto = "¡LLEGA AL ORO!"
 
     def mover(self, df, dc):
         nf, nc = self.pos_pablo[0] + df, self.pos_pablo[1] + dc
@@ -49,250 +44,57 @@ class BBotConsola:
                 self.pos_pablo = [nf, nc]
                 if nf == 7 and nc == 7:
                     self.modo = "MENU"
-                    self.texto = "¡GANASTE PABLO ALI! ERES PRO"
+                    self.texto = "¡GANASTE PABLO ALI!"
 
-    def dibujar_menu(self):
+    def dibujar_todo(self):
         self.screen.fill(COLOR_FONDO)
-        font_t = pygame.font.SysFont("Arial", 30, bold=True)
-        font_o = pygame.font.SysFont("Arial", 22, bold=True)
+        font = pygame.font.SysFont("Arial", 22, bold=True)
         
-        self.screen.blit(font_t.render("MENU DEL B-BOT", True, COLOR_VIVO), (280, 40))
-        opciones = ["1. LABERINTO", "2. MASCOTA", "3. CHISTES", "4. CUENTOS"]
-        for i, opt in enumerate(opciones):
-            pygame.draw.rect(self.screen, (255, 255, 255), (200, 100 + i*60, 400, 45), border_radius=10)
-            self.screen.blit(font_o.render(opt, True, (50, 50, 80)), (250, 110 + i*60))
-
-    def dibujar_laberinto(self):
-        self.screen.fill((40, 40, 60))
-        tam, ox, oy = 40, 240, 40
-        for f in range(8):
-            for c in range(8):
-                color = (80, 80, 150) if self.mapa[f][c] == 1 else (220, 220, 250)
-                if f == 7 and c == 7: color = (255, 215, 0)
-                pygame.draw.rect(self.screen, color, (ox + c*tam, oy + f*tam, tam-4, tam-4), border_radius=8)
-        # Personaje
-        pygame.draw.circle(self.screen, COLOR_VIVO, (ox + self.pos_pablo[1]*tam + 18, oy + self.pos_pablo[0]*tam + 18), 15)
-
-    def procesar_eventos(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.running = False
-
-            if event.type == pygame.JOYBUTTONDOWN:
-                self.ultima_accion = time.time()
-                # Volver al menú (Cualquier botón de sistema)
-                if event.button in [6, 7, 8, 9]:
-                    self.modo = "MENU"
-                    self.texto = "¿QUE HACEMOS AHORA?"
-                    continue
-
-                if self.modo == "MENU":
-                    if event.button == 0: self.iniciar_laberinto()
-                    elif event.button == 1: 
-                        self.modo = "MASCOTA"
-                        self.texto = "¡HOLA! TENGO HAMBRE"
-                    elif event.button == 2: 
-                        self.modo = "CHISTES"
-                        self.texto = obtener_chiste()
-                    elif event.button == 3: 
-                        self.modo = "CUENTOS"
-                        self.texto = "HABIA UNA VEZ UN ROBOT..."
-
-            if self.modo == "JUEGO":
-                if event.type == pygame.JOYHATMOTION:
-                    hx, hy = event.value
-                    if hx != 0: self.mover(0, hx)
-                    if hy != 0: self.mover(-hy, 0)
+        if self.modo == "MENU":
+            pygame.draw.rect(self.screen, (255, 255, 255), (200, 50, 400, 300), border_radius=20)
+            opciones = ["1. JUGAR", "2. MASCOTA", "3. CHISTES", "4. CUENTOS"]
+            for i, opt in enumerate(opciones):
+                txt = font.render(opt, True, (50, 50, 80))
+                self.screen.blit(txt, (300, 100 + i*60))
+        
+        elif self.modo == "JUEGO":
+            ox, oy = 240, 40
+            for f in range(8):
+                for c in range(8):
+                    color = (80, 80, 150) if self.mapa[f][c] == 1 else (220, 220, 250)
+                    if f == 7 and c == 7: color = (255, 215, 0)
+                    pygame.draw.rect(self.screen, color, (ox+c*40, oy+f*40, 36, 36), border_radius=5)
+            pygame.draw.circle(self.screen, COLOR_VIVO, (ox+self.pos_pablo[1]*40+18, oy+self.pos_pablo[0]*40+18), 15)
+        
+        else:
+            txt = font.render(self.texto.upper(), True, (255, 255, 255))
+            self.screen.blit(txt, (100, 180))
 
     def run(self):
         while self.running:
-            self.procesar_eventos()
+            self.dibujar_todo()
             
-            if self.modo == "MENU":
-                self.dibujar_menu()
-            elif self.modo == "JUEGO":
-                self.dibujar_laberinto()
-            else:
-                self.screen.fill(COLOR_FONDO)
-                font = pygame.font.SysFont("Arial", 24, bold=True)
-                # Mostrar texto (máximo 45 caracteres por seguridad visual)
-                txt = font.render(self.texto[:45].upper(), True, COLOR_TEXTO)
-                self.screen.blit(txt, (80, 180))
-
-            pygame.display.flip()
-            self.clock.tick(30)
-
-if __name__ == "__main__":
-    app = BBotConsola()
-    app.run()
-    pygame.quit()        self.running = True
-
-    def iniciar_laberinto(self):
-        self.modo = "JUEGO"
-        self.mapa = generar_laberinto(8)
-        self.pos_pablo = [0, 0]
-        self.texto = "¡LLEGA AL ORO CON LAS FLECHAS!"
-
-    def mover(self, df, dc):
-        nf, nc = self.pos_pablo[0] + df, self.pos_pablo[1] + dc
-        # Verificar límites y que no sea pared (1)
-        if 0 <= nf < 8 and 0 <= nc < 8:
-            if self.mapa[nf][nc] == 0:
-                self.pos_pablo = [nf, nc]
-                if nf == 7 and nc == 7:
-                    self.modo = "MENU"
-                    self.texto = "¡GANASTE PABLO ALI! ERES PRO"
-
-    def dibujar_menu(self):
-        self.screen.fill(COLOR_FONDO)
-        font_t = pygame.font.SysFont("Arial", 30, bold=True)
-        font_o = pygame.font.SysFont("Arial", 22, bold=True)
-        
-        self.screen.blit(font_t.render("MENU DEL B-BOT", True, COLOR_VIVO), (280, 40))
-        opciones = ["1. LABERINTO", "2. MASCOTA", "3. CHISTES", "4. CUENTOS"]
-        for i, opt in enumerate(opciones):
-            pygame.draw.rect(self.screen, (255, 255, 255), (200, 100 + i*60, 400, 45), border_radius=10)
-            self.screen.blit(font_o.render(opt, True, (50, 50, 80)), (250, 110 + i*60))
-
-    def dibujar_laberinto(self):
-        self.screen.fill((40, 40, 60))
-        tam, ox, oy = 40, 240, 40
-        for f in range(8):
-            for c in range(8):
-                color = (80, 80, 150) if self.mapa[f][c] == 1 else (220, 220, 250)
-                if f == 7 and c == 7: color = (255, 215, 0)
-                pygame.draw.rect(self.screen, color, (ox + c*tam, oy + f*tam, tam-4, tam-4), border_radius=8)
-        # Personaje Pablo Alí
-        pygame.draw.circle(self.screen, COLOR_VIVO, (ox + self.pos_pablo[1]*tam + 18, oy + self.pos_pablo[0]*tam + 18), 15)
-
-    def run(self):
-        while self.running:
-            ahora = time.time()
-            
-            if self.modo == "MENU":
-                self.dibujar_menu()
-            elif self.modo == "JUEGO":
-                self.dibujar_laberinto()
-            else:
-                self.screen.fill(COLOR_FONDO)
-                font = pygame.font.SysFont("Arial", 24, bold=True)
-                # Dividir texto si es muy largo
-                self.screen.blit(font.render(self.texto[:40].upper(), True, (255, 255, 255)), (50, 180))
-
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: 
+                if event.type == pygame.QUIT:
                     self.running = False
-                
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        self.running = False
-
-                if event.type == pygame.JOYBUTTONDOWN:
-                    self.ultima_accion = ahora  # <--- CORREGIDO AQUÍ
-                    if self.modo == "MENU":
-                        if event.button == 0: self.iniciar_laberinto()
-                        elif event.button == 1: 
-                            self.modo = "MASCOTA"
-                            self.texto = "¡HOLA! TENGO HAMBRE"
-                        elif event.button == 2: 
-                            self.modo = "CHISTES"
-                            self.texto = obtener_chiste()
-                        elif event.button == 3: 
-                            self.modo = "CUENTOS"
-                            self.texto = "HABIA UNA VEZ UN ROBOT..."
-                    
-                    # Botón para volver al menú (Start/Select)
-                    if event.button in [6, 7, 8, 9]:
-                        self.modo = "MENU"
-                        self.texto = "¿QUE HACEMOS AHORA?"
-
-                if self.modo == "JUEGO":
-                    if event.type == pygame.JOYHATMOTION:
-                        hx, hy = event.value
-                        if hx != 0: self.mover(0, hx)
-                        if hy != 0: self.mover(-hy, 0)
-
-            pygame.display.flip()
-            self.clock.tick(30)
-
-if __name__ == "__main__":
-    app = BBotConsola()
-    app.run()
-    pygame.quit()        self.modo = "JUEGO"
-        self.mapa = generar_laberinto(8)
-        self.pos_pablo = [0, 0]
-        self.texto = "¡LLEGA AL ORO CON LAS FLECHAS!"
-
-    def mover(self, df, dc):
-        nf, nc = self.pos_pablo[0] + df, self.pos_pablo[1] + dc
-        if 0 <= nf < 8 and 0 <= nc < 8 and self.mapa[nf][nc] == 0:
-            self.pos_pablo = [nf, nc]
-            if nf == 7 and nc == 7:
-                self.modo = "MENU"
-                self.texto = "¡GANASTE PABLO ALI! ERES PRO"
-
-    def dibujar_menu(self):
-        self.screen.fill(COLOR_FONDO)
-        font_t = pygame.font.SysFont("Arial", 30, bold=True)
-        font_o = pygame.font.SysFont("Arial", 22, bold=True)
-        
-        self.screen.blit(font_t.render("MENU DEL B-BOT", True, COLOR_VIVO), (280, 40))
-        opciones = ["1. LABERINTO", "2. MASCOTA", "3. CHISTES", "4. CUENTOS"]
-        for i, opt in enumerate(opciones):
-            pygame.draw.rect(self.screen, (255, 255, 255), (200, 100 + i*60, 400, 45), border_radius=10)
-            self.screen.blit(font_o.render(opt, True, (50, 50, 80)), (250, 110 + i*60))
-
-    def dibujar_laberinto(self):
-        self.screen.fill((40, 40, 60))
-        tam, ox, oy = 40, 240, 40
-        for f in range(8):
-            for c in range(8):
-                color = (80, 80, 150) if self.mapa[f][c] == 1 else (220, 220, 250)
-                if f == 7 and c == 7: color = (255, 215, 0)
-                pygame.draw.rect(self.screen, color, (ox + c*tam, oy + f*tam, tam-4, tam-4), border_radius=8)
-        # Pablo Alí
-        pygame.draw.circle(self.screen, COLOR_VIVO, (ox + self.pos_pablo[1]*tam + 18, oy + self.pos_pablo[0]*tam + 18), 15)
-
-    def run(self):
-        while self.running:
-            ahora = time.time()
-            
-            # Dibujar según el modo
-            if self.modo == "MENU":
-                self.dibujar_menu()
-            elif self.modo == "JUEGO":
-                self.dibujar_laberinto()
-            else:
-                # Fondo simple para chistes/cuentos/mascota
-                self.screen.fill(COLOR_FONDO)
-                font = pygame.font.SysFont("Arial", 24, bold=True)
-                self.screen.blit(font.render(self.texto.upper(), True, (255, 255, 255)), (50, 180))
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT: self.running = False
                 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     self.running = False
 
                 if event.type == pygame.JOYBUTTONDOWN:
-                    self.ultima_accion ahora
                     if self.modo == "MENU":
                         if event.button == 0: self.iniciar_laberinto()
-                        elif event.button == 1: self.modo = "MASCOTA"; self.texto = "¡HOLA! TENGO HAMBRE"
+                        elif event.button == 1: self.modo = "MASCOTA"; self.texto = "¡TENGO HAMBRE!"
                         elif event.button == 2: self.modo = "CHISTES"; self.texto = obtener_chiste()
                         elif event.button == 3: self.modo = "CUENTOS"; self.texto = "HABIA UNA VEZ UN ROBOT..."
-                    elif event.button in [6, 7, 8, 9]: # Salir al menú
+                    
+                    if event.button in [6, 7, 8, 9]:
                         self.modo = "MENU"
 
-                if self.modo == "JUEGO":
-                    if event.type == pygame.JOYHATMOTION:
-                        hx, hy = event.value
-                        if hx != 0: self.mover(0, hx)
-                        if hy != 0: self.mover(-hy, 0)
+                if self.modo == "JUEGO" and event.type == pygame.JOYHATMOTION:
+                    hx, hy = event.value
+                    if hx != 0: self.mover(0, hx)
+                    if hy != 0: self.mover(-hy, 0)
 
             pygame.display.flip()
             self.clock.tick(30)
