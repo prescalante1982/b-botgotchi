@@ -38,8 +38,12 @@ def obtener_cuento_dinamico():
         "Juntos descubrieron que el universo es genial.",
         "FIN. ¡Botón 1 para otra aventura!"
     ]
-
 def generar_laberinto(dim=8):
-    mapa = [[1 if random.random() < 0.25 else 0 for _ in range(dim)] for _ in range(dim)]
-    mapa[0][0] = mapa[dim-1][dim-1] = mapa[0][1] = mapa[1][0] = 0
-    return mapa
+    # Probabilidad de pared 0.2 para que sea fácil navegar
+    mapa = [[1 if random.random() < 0.2 else 0 for _ in range(dim)] for _ in range(dim)]
+    mapa[0][0] = 0 # Inicio siempre libre
+    mapa[dim-1][dim-1] = 0 # Meta siempre libre
+    # Asegurar salida
+    mapa[0][1] = 0
+    mapa[1][0] = 0
+    return mapa mapa
