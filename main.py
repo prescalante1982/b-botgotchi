@@ -58,4 +58,78 @@ class BBotApp:
             pygame.draw.circle(self.screen, color, (355, 105), 22) 
             pygame.draw.circle(self.screen, (255, 255, 255), (355, 105), 10)
             # Ojo Derecho
-            pygame.draw.circle(self.screen, color
+            pygame.draw.circle(self.screen, color, (445, 105), 22)
+            pygame.draw.circle(self.screen, (255, 255, 255), (445, 105), 10)
+
+        # 4. BOCA
+        if self.mood == "feliz":
+            pygame.draw.rect(self.screen, COLOR_VIVO, (370, 190, 60, 10), border_radius=5)
+        else:
+            pygame.draw.circle(self.screen, COLOR_LOCO, (400, 200), 15, 3)
+
+        # 5. BURBUJA DE TEXTO (Letra muy grande para Pablo Alí)
+        pygame.draw.rect(self.screen, (255, 255, 255), (30, 285, 740, 95), border_radius=20)
+        
+        # Usamos Arial Bold (Fuente estándar en la mayoría de sistemas)
+        font = pygame.font.SysFont("Arial", 28, bold=True)
+        
+        # Dividir texto en 2 líneas
+        palabras = self.texto.split(' ')
+        l1, l2 = "", ""
+        for p in palabras:
+            if len(l1 + p) < 28: l1 += p + " "
+            else: l2 += p + " "
+
+        s1 = font.render(l1.upper(), True, (30, 30, 60))
+        s2 = font.render(l2.upper(), True, (30, 30, 60))
+        self.screen.blit(s1, (60, 295))
+        self.screen.blit(s2, (60, 335))
+
+        # 6. BARRA DE NIVEL
+        pygame.draw.rect(self.screen, (30, 30, 50), (20, 20, 180, 20), border_radius=10)
+        ancho_xp = (self.datos["xp"] / 50) * 170
+        pygame.draw.rect(self.screen, COLOR_VIVO, (25, 25, ancho_xp, 10), border_radius=5)
+
+    def guardar(self):
+        with open(CONFIG_FILE, 'w') as f: json.dump(self.datos, f)
+
+    def run(self):
+        while self.running:
+            self.dibujar_interfaz()
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: self.running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE: self.running = False
+                
+                # --- DETECCIÓN DINÁMICA DE BOTONES ---
+                if event.type == pygame.JOYBUTTONDOWN:
+                    print(f"Control {event.joy} - Botón {event.button}") # Debug
+                    
+                    # Acción A (Dato Curioso): Acepta botones 0, 1 o 2 (Mapeos comunes)
+                    if event.button in [0, 1, 2]:
+                        self.mood = "feliz"
+                        self.texto = obtener_dato_curioso(self.datos)
+                        self.datos["xp"] += 10
+                        if self.datos["xp"] >= 50:
+                            self.datos["nivel"] += 1
+                            self.datos["xp"] = 0
+                            self.texto = "¡SUBIMOS DE NIVEL! GENIAL PABLO ALI"
+                        self.guardar()
+                    
+                    # Acción B (Chiste): Acepta botones 1, 3 o 4
+                    elif event.button in [1, 3, 4]:
+                        self.mood = "loco"
+                        self.texto = obtener_chiste()
+                    
+                    # Botón Salir (Start/Select o botón 7/8/9)
+                    elif event.button in [7, 8, 9]:
+                        self.running = False
+
+            pygame.display.flip()
+            self.clock.tick(30)
+
+if __name__ == "__main__":
+    app = BBotApp()
+    app.run()
+    pygame.quit()
