@@ -3,22 +3,24 @@ import random
 
 def obtener_chiste():
     try:
-        url = "https://v2.jokeapi.dev/joke/Any?lang=es&type=single"
-        response = requests.get(url, timeout=1.5) # Timeout más agresivo
+        # Intentamos obtener chistes de una categoría segura
+        url = "https://v2.jokeapi.dev/joke/Any?lang=es&type=single&blacklistFlags=nsfw,religious,political,racist,sexist,explicit"
+        response = requests.get(url, timeout=1.5)
         if response.status_code == 200:
             data = response.json()
-            if not data.get("error"):
-                return data["joke"]
-    except:
-        pass
+            if not data.get("error"): return data["joke"]
+    except: pass
     
-    chistes_locales = [
-        "¿Qué le dice un jaguar a otro? ¡Jaguar you!",
-        "¿Cómo se dice pañuelo en japonés? Saka-moko.",
-        "¿Cuál es el colmo de un robot? ¡Que se le crucen los cables!",
-        "¿Qué hace una abeja en el gimnasio? ¡Zumba!"
+    # Chistes infantiles de respaldo (Nunca fallan)
+    chistes_infantiles = [
+        "¿Qué le dice un pato a otro pato? ¡Estamos empatados!",
+        "¿Cuál es el animal que es dos veces animal? El gato, porque es gato y araña.",
+        "¿Por qué los libros de matemáticas están tristes? Porque tienen muchos problemas.",
+        "¿Qué le dice una gallina a otra? ¡Ven-p'acá!",
+        "¿Cómo se dice 'perro' en inglés? Dog. ¿Y 'veterinario'? Dog-tor.",
+        "¿Qué hace un perro con un taladro? Dog-torando."
     ]
-    return random.choice(chistes_locales)
+    return random.choice(chistes_infantiles)
 
 def obtener_dato_wikipedia():
     try:
@@ -26,15 +28,13 @@ def obtener_dato_wikipedia():
         response = requests.get(url, timeout=2)
         if response.status_code == 200:
             data = response.json()
-            titulo = data.get("title", "ALGO GENIAL")
-            extracto = data.get("extract", "Es un misterio por descubrir.")
-            return f"{titulo}: {extracto}"
+            return f"{data.get('title', 'EL UNIVERSO')}: {data.get('extract', 'Es un lugar lleno de aventuras.')}"
     except:
         return "EL ESPACIO: Es gigante y está lleno de estrellas brillantes."
 
 def obtener_cuento_dinamico():
+    # Aseguramos que siempre devuelva una LISTA para evitar que main.py se rompa
     dato = obtener_dato_wikipedia()
-    # Si no hay ':' usamos el texto completo, si lo hay, solo el título
     tema = dato.split(':')[0].upper() if ':' in dato else "UNA AVENTURA"
     
     return [
@@ -46,8 +46,17 @@ def obtener_cuento_dinamico():
     ]
 
 def generar_laberinto(dim=8):
-    mapa = [[1 if random.random() < 0.25 else 0 for _ in range(dim)] for _ in range(dim)]
-    mapa[0][0] = 0; mapa[dim-1][dim-1] = 0
-    # Asegurar salida del inicio
-    mapa[0][1] = 0; mapa[1][0] = 0
+    # Más retador: subimos la probabilidad de obstáculos a 0.3 (30%)
+    # Pero usamos un bucle para asegurar que el laberinto sea posible
+    intentos = 0
+    while intentos < 10:
+        mapa = [[1 if random.random() < 0.32 else 0 for _ in range(dim)] for _ in range(dim)]
+        mapa[0][0] = 0; mapa[dim-1][dim-1] = 0
+        mapa[0][1] = 0; mapa[1][0] = 0 # Pasillo inicial
+        
+        # Verificación rápida: si hay un muro rodeando la meta, reintentar
+        if mapa[6][7] == 1 and mapa[7][6] == 1:
+            intentos += 1
+            continue
+        return mapa
     return mapa
