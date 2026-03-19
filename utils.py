@@ -1,62 +1,64 @@
 import requests
 import random
 
+# Variable global para evitar repeticiones
+ultimo_chiste = ""
+
 def obtener_chiste():
-    try:
-        # Intentamos obtener chistes de una categoría segura
-        url = "https://v2.jokeapi.dev/joke/Any?lang=es&type=single&blacklistFlags=nsfw,religious,political,racist,sexist,explicit"
-        response = requests.get(url, timeout=1.5)
-        if response.status_code == 200:
-            data = response.json()
-            if not data.get("error"): return data["joke"]
-    except: pass
-    
-    # Chistes infantiles de respaldo (Nunca fallan)
+    global ultimo_chiste
     chistes_infantiles = [
         "¿Qué le dice un pato a otro pato? ¡Estamos empatados!",
         "¿Cuál es el animal que es dos veces animal? El gato, porque es gato y araña.",
         "¿Por qué los libros de matemáticas están tristes? Porque tienen muchos problemas.",
-        "¿Qué le dice una gallina a otra? ¡Ven-p'acá!",
+        "¿Qué hace un perro con un taladro? Dog-torando.",
         "¿Cómo se dice 'perro' en inglés? Dog. ¿Y 'veterinario'? Dog-tor.",
-        "¿Qué hace un perro con un taladro? Dog-torando."
+        "¿Qué le dice una iguana a su hermana? Somos iguanitas."
     ]
-    return random.choice(chistes_infantiles)
-
-def obtener_dato_wikipedia():
+    
     try:
-        url = "https://es.wikipedia.org/api/rest_v1/page/random/summary"
-        response = requests.get(url, timeout=2)
+        url = "https://v2.jokeapi.dev/joke/Any?lang=es&type=single&blacklistFlags=nsfw,explicit"
+        response = requests.get(url, timeout=1.2)
         if response.status_code == 200:
-            data = response.json()
-            return f"{data.get('title', 'EL UNIVERSO')}: {data.get('extract', 'Es un lugar lleno de aventuras.')}"
-    except:
-        return "EL ESPACIO: Es gigante y está lleno de estrellas brillantes."
+            nuevo = response.json().get("joke", random.choice(chistes_infantiles))
+            if nuevo != ultimo_chiste:
+                ultimo_chiste = nuevo
+                return nuevo
+    except: pass
+    
+    nuevo = random.choice(chistes_infantiles)
+    while nuevo == ultimo_chiste: nuevo = random.choice(chistes_infantiles)
+    ultimo_chiste = nuevo
+    return nuevo
 
 def obtener_cuento_dinamico():
-    # Aseguramos que siempre devuelva una LISTA para evitar que main.py se rompa
-    dato = obtener_dato_wikipedia()
-    tema = dato.split(':')[0].upper() if ':' in dato else "UNA AVENTURA"
-    
-    return [
+    # RESPALDO SEGURO: Si todo falla, esto evita que la App se cierre
+    cuento_respaldo = [
         "B-Bot encendió sus motores de plasma...",
-        f"¡Viajó a investigar sobre {tema}!",
-        "Pablo Alí lo acompañó en la cabina de mando.",
-        "Juntos descubrieron que el universo es genial.",
-        "FIN. ¡Pulsa el Botón 1 para volver!"
+        "¡Viajó a una estrella lejana!",
+        "Pablo Alí lo acompañó en la misión.",
+        "¡Fue una aventura increíble!",
+        "FIN. Presiona Botón 1 para volver."
     ]
+    try:
+        url = "https://es.wikipedia.org/api/rest_v1/page/random/summary"
+        response = requests.get(url, timeout=1.5)
+        if response.status_code == 200:
+            data = response.json()
+            tema = data.get('title', 'EL ESPACIO').upper()
+            return [
+                f"B-Bot está analizando: {tema}",
+                "Iniciando teletransporte...",
+                f"Pablo Alí descubrió que {tema} es asombroso.",
+                "¡Misión completada con éxito!",
+                "FIN. Presiona Botón 1 para volver."
+            ]
+    except:
+        return cuento_respaldo
+    return cuento_respaldo
 
 def generar_laberinto(dim=8):
-    # Más retador: subimos la probabilidad de obstáculos a 0.3 (30%)
-    # Pero usamos un bucle para asegurar que el laberinto sea posible
-    intentos = 0
-    while intentos < 10:
-        mapa = [[1 if random.random() < 0.32 else 0 for _ in range(dim)] for _ in range(dim)]
-        mapa[0][0] = 0; mapa[dim-1][dim-1] = 0
-        mapa[0][1] = 0; mapa[1][0] = 0 # Pasillo inicial
-        
-        # Verificación rápida: si hay un muro rodeando la meta, reintentar
-        if mapa[6][7] == 1 and mapa[7][6] == 1:
-            intentos += 1
-            continue
-        return mapa
+    # Laberinto retador garantizado
+    mapa = [[1 if random.random() < 0.35 else 0 for _ in range(dim)] for _ in range(dim)]
+    mapa[0][0] = 0; mapa[7][7] = 0
+    mapa[0][1] = 0; mapa[1][0] = 0 # Asegurar salida
     return mapa
