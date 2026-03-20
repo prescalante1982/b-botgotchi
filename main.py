@@ -5,27 +5,24 @@ import time
 import math
 import random
 
-# --- CONFIGURACIÓN VISUAL ---
+# --- CONFIGURACIÓN ---
 ANCHO, ALTO = 800, 400
 CELESTE_CIELO = (173, 216, 230)
-NEGRO_ESPACIO = (10, 10, 30)
 CONFIG_FILE = "config_pablo.json"
 FUENTE_RETRO = "Courier New"
 
-# --- RECURSOS ---
-ESTRELLAS = [[random.randint(0, ANCHO), random.randint(0, ALTO), random.random()] for _ in range(60)]
-
 # ==========================================
-# JUEGOS (Naves con Estrellas y Carros Gris)
+# LÓGICA DE JUEGOS (Naves y Carreras)
 # ==========================================
 
 class JuegoNaves:
     def __init__(self):
         self.x = 400; self.balas = []; self.enemigos = []; self.puntos = 0; self.vidas = 3
-    def actualizar(self, ent, ctrl):
-        if ent == "IZQUIERDA": self.x = max(30, self.x - 45)
-        elif ent == "DERECHA": self.x = min(770, self.x + 45)
-        elif ent == "X": self.balas.append([self.x, 340])
+        self.estrellas = [[random.randint(0, 800), random.randint(0, 400), random.random()] for _ in range(50)]
+    def actualizar(self, accion):
+        if accion == "IZQUIERDA": self.x = max(30, self.x - 45)
+        elif accion == "DERECHA": self.x = min(770, self.x + 45)
+        elif accion == "X": self.balas.append([self.x, 340])
         if random.random() < 0.08: self.enemigos.append([random.randint(50,750), -40])
         for b in self.balas[:]:
             b[1] -= 20
@@ -41,9 +38,9 @@ class JuegoNaves:
             if e[1] > 400: self.enemigos.remove(e)
         return False
     def dibujar(self, sc):
-        sc.fill(NEGRO_ESPACIO)
-        for s in ESTRELLAS: 
-            s[0] = (s[0] - s[2]*2) % ANCHO
+        sc.fill((10, 10, 30))
+        for s in self.estrellas: 
+            s[0] = (s[0] - s[2]*2) % 800
             pygame.draw.circle(sc, (255,255,255), (int(s[0]), s[1]), 1)
         pygame.draw.rect(sc, (0,200,255), (self.x-20, 350, 40, 10))
         pygame.draw.rect(sc, (0,200,255), (self.x-20, 335, 8, 15))
@@ -54,29 +51,6 @@ class JuegoNaves:
             pygame.draw.circle(sc, (200,255,255), (e[0], e[1]-5), 8)
         for b in self.balas: pygame.draw.rect(sc, (255,255,0), (b[0]-2, b[1], 4, 10))
 
-class JuegoCarreras:
-    def __init__(self):
-        self.x = 400; self.obs = []; self.v = 5; self.vidas = 3; self.flash = 0
-    def actualizar(self, ent, ctrl):
-        if self.flash > 0: self.flash -= 1
-        if ent == "IZQUIERDA": self.x = max(200, self.x - 35)
-        elif ent == "DERECHA": self.x = min(600, self.x + 35)
-        if random.random() < 0.07: self.obs.append([random.randint(210, 590), -100])
-        for o in self.obs[:]:
-            o[1] += int(self.v + 3)
-            if 310 < o[1] < 385 and abs(self.x - o[0]) < 45:
-                self.vidas -= 1; self.flash = 12; self.obs = []; self.v = 5
-            elif o[1] > 450: self.obs.remove(o)
-        return self.vidas <= 0
-    def dibujar(self, sc):
-        sc.fill((34, 139, 34))
-        pygame.draw.rect(sc, (110, 110, 110), (180, 0, 440, 400))
-        pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400))
-        if self.flash > 0: sc.fill((200, 0, 0), special_flags=pygame.BLEND_ADD)
-        pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6)
-        pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12))
-        for o in self.obs: pygame.draw.rect(sc, (255,140,0), (o[0]-20, o[1], 40, 60), border_radius=6)
-
 # ==========================================
 # CONSOLA PRINCIPAL
 # ==========================================
@@ -84,7 +58,6 @@ class JuegoCarreras:
 class BBotConsola:
     def __init__(self):
         pygame.init(); pygame.joystick.init()
-        self.joy = None
         if pygame.joystick.get_count() > 0:
             self.joy = pygame.joystick.Joystick(0); self.joy.init()
         
@@ -97,74 +70,78 @@ class BBotConsola:
         else:
             with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
             
-        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L"]
+        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "L"]
         self.idx_cfg = 0; self.seleccion = 0; self.juego = None
 
-    def obtener_entrada_mapeada(self, ev_actual):
-        """Convierte evento de Pygame en una acción (ej: 'IZQUIERDA')"""
+    def detectar_entrada(self, ev):
+        """Detecta cualquier tipo de entrada (Botón, Cruz/Hat o Eje de Palanca)"""
+        if ev.type == pygame.JOYBUTTONDOWN:
+            return {"tipo": "btn", "val": ev.button}
+        if ev.type == pygame.JOYHATMOTION and ev.value != (0,0):
+            return {"tipo": "hat", "val": list(ev.value)}
+        if ev.type == pygame.JOYAXISMOTION:
+            if ev.value > 0.8: return {"tipo": "axis", "axis": ev.axis, "val": 1}
+            if ev.value < -0.8: return {"tipo": "axis", "axis": ev.axis, "val": -1}
+        return None
+
+    def obtener_accion(self, ev_actual):
+        """Compara la entrada actual con el archivo de configuración"""
         if not self.controles: return None
         for accion, mapeo in self.controles.items():
             if ev_actual.type == pygame.JOYBUTTONDOWN and mapeo.get("tipo") == "btn":
-                if ev_actual.button == mapeo.get("val"): return accion
+                if ev_actual.button == mapeo["val"]: return accion
             if ev_actual.type == pygame.JOYHATMOTION and mapeo.get("tipo") == "hat":
-                if list(ev_actual.value) == mapeo.get("val"): return accion
+                if list(ev_actual.value) == mapeo["val"]: return accion
+            if ev_actual.type == pygame.JOYAXISMOTION and mapeo.get("tipo") == "axis":
+                if ev_actual.axis == mapeo["axis"]:
+                    if (ev_actual.value > 0.8 and mapeo["val"] == 1) or (ev_actual.value < -0.8 and mapeo["val"] == -1):
+                        return accion
         return None
 
     def run(self):
         while self.running:
             self.screen.fill(CELESTE_CIELO)
             t = pygame.time.get_ticks()
-            accion = None
+            accion_detectada = None
 
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
                 
-                # Captura cruda para CONFIG
                 if self.modo == "CONFIG":
-                    mapeo_nuevo = None
-                    if ev.type == pygame.JOYBUTTONDOWN:
-                        mapeo_nuevo = {"tipo": "btn", "val": ev.button}
-                    elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0):
-                        mapeo_nuevo = {"tipo": "hat", "val": list(ev.value)}
-                    
-                    if mapeo_nuevo:
-                        self.controles[self.pasos_cfg[self.idx_cfg]] = mapeo_nuevo
+                    mapeo = self.detectar_entrada(ev)
+                    if mapeo:
+                        self.controles[self.pasos_cfg[self.idx_cfg]] = mapeo
                         self.idx_cfg += 1
-                        pygame.time.delay(400) # Evita saltos locos
+                        pygame.time.delay(500) # Pausa para que sueltes el botón
                         if self.idx_cfg >= len(self.pasos_cfg):
                             with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
                             self.modo = "MENU"
-                
-                # Captura mapeada para MENU y JUEGOS
                 else:
-                    accion = self.obtener_entrada_mapeada(ev)
+                    accion_detectada = self.obtener_accion(ev)
 
-            # Lógica de navegación
-            if accion == "L": self.modo = "MENU"; self.juego = None
+            if accion_detectada == "L": self.modo = "MENU"; self.juego = None
 
             if self.modo == "CONFIG":
-                self.mostrar_t("PULSA EL BOTON PARA:", y=150, color=(0,0,0), size=30)
-                self.mostrar_t(self.pasos_cfg[self.idx_cfg], y=220, color=(200,0,0), size=45)
+                self.mostrar_t("CONFIGURACIÓN DE MANDO", y=100, color=(0,0,0), size=30)
+                self.mostrar_t(f"PRESIONA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=40)
 
             elif self.modo == "MENU":
                 self.dibujar_bot(t)
-                opts = ["JUGAR", "CHISTES", "CUENTOS"]
+                opts = ["JUGAR", "CUENTOS"]
                 for i, opt in enumerate(opts):
                     c = (255,255,255) if self.seleccion == i else (140, 190, 210)
-                    pygame.draw.rect(self.screen, c, (100+i*220, 310, 180, 50), border_radius=15)
-                    self.mostrar_t(opt, 100+i*220+90, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
-                
-                if accion == "DERECHA": self.seleccion = (self.seleccion+1)%len(opts)
-                elif accion == "IZQUIERDA": self.seleccion = (self.seleccion-1)%len(opts)
-                elif accion == "A": self.modo = opts[self.seleccion]
+                    pygame.draw.rect(self.screen, c, (200+i*220, 310, 180, 50), border_radius=15)
+                    self.mostrar_t(opt, 200+i*220+90, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
+                if accion_detectada == "DERECHA": self.seleccion = (self.seleccion+1)%len(opts)
+                elif accion_detectada == "IZQUIERDA": self.seleccion = (self.seleccion-1)%len(opts)
+                elif accion_detectada == "A": self.modo = opts[self.seleccion]
 
             elif self.modo == "JUGAR":
                 if not self.juego:
-                    self.mostrar_t("A: NAVES | B: CARROS", y=200, color=(0,0,0), size=30)
-                    if accion == "A": self.juego = JuegoNaves()
-                    elif accion == "B": self.juego = JuegoCarreras()
+                    self.mostrar_t("A: NAVES", y=200, color=(0,0,0), size=30)
+                    if accion_detectada == "A": self.juego = JuegoNaves()
                 else:
-                    if self.juego.actualizar(accion, self.controles): self.juego = None
+                    if self.juego.actualizar(accion_detectada): self.juego = None
                     else: self.juego.dibujar(self.screen)
 
             pygame.display.flip(); self.clock.tick(60)
