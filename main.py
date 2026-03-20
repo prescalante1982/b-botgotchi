@@ -5,23 +5,24 @@ import time
 import math
 import random
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN VISUAL ---
 ANCHO, ALTO = 800, 400
-COLOR_FONDO = (10, 10, 30) # Fondo oscuro para que brillen las estrellas
+CELESTE_CIELO = (173, 216, 230)
+NEGRO_ESPACIO = (10, 10, 30)
 CONFIG_FILE = "config_pablo.json"
 FUENTE_RETRO = "Courier New"
 
-# --- GENERACIÓN DE ESTRELLAS ---
+# --- RECURSOS ---
+# Estrellas con movimiento para el juego de naves
 ESTRELLAS = [[random.randint(0, ANCHO), random.randint(0, ALTO), random.random()] for _ in range(60)]
 
 CUENTOS = [
     ["El Caballero de la E", 
      "Había una vez un valiente piloto llamado Pablo Alí que viajaba en una nave con forma de letra E.",
-     "Un día, cruzó un portal de estrellas y llegó a un planeta donde los UFOs tenían cúpulas de cristal.",
-     "Con su puntería láser, logró proteger a los robots locales y se convirtió en el héroe del sector 100."],
+     "Un día, cruzó un portal de estrellas y llegó a un planeta donde los UFOs tenían cúpulas."],
     ["Los Túneles Mágicos",
-     "Pac-Man descubrió que las paredes de su mundo tenían secretos: si caminaba hacia la izquierda total...",
-     "¡Aparecía mágicamente por la derecha! Engañó a los dos fantasmas que lo perseguían sin descanso."]
+     "Pac-Man descubrió que las paredes de su mundo tenían secretos: si caminaba hacia la izquierda...",
+     "¡Aparecía mágicamente por la derecha! Engañó a los fantasmas."]
 ]
 
 def envolver_texto(texto, fuente, ancho_max):
@@ -34,7 +35,165 @@ def envolver_texto(texto, fuente, ancho_max):
     return lineas
 
 # ==========================================
-# JUEGOS
+# CLASES DE JUEGOS
+# ==========================================
+
+class JuegoNaves:
+    def __init__(self):
+        self.x = 400; self.balas = []; self.enemigos = []; self.puntos = 0; self.vidas = 3
+    def actualizar(self, ent, ctrl):
+        if ent == ctrl.get("IZQUIERDA"): self.x = max(30, self.x - 45)
+        elif ent == ctrl.get("DERECHA"): self.x = min(770, self.x + 45)
+        elif ent == ctrl.get("X"): self.balas.append([self.x, 340])
+        if random.random() < 0.08: self.enemigos.append([random.randint(50,750), -40])
+        for b in self.balas[:]:
+            b[1] -= 20
+            if b[1] < 0: self.balas.remove(b)
+        for e in self.enemigos[:]:
+            e[1] += (6 + self.puntos//100)
+            if e[1] > 330 and abs(e[0]-self.x) < 40:
+                self.vidas -= 1; self.enemigos = []; return self.vidas <= 0
+            for b in self.balas[:]:
+                if abs(e[0]-b[0])<30 and abs(e[1]-b[1])<30:
+                    if e in self.enemigos: self.enemigos.remove(e)
+                    self.balas.remove(b); self.puntos += 10; break
+            if e[1] > 400: self.enemigos.remove(e)
+        return False
+    def dibujar(self, sc):
+        sc.fill(NEGRO_ESPACIO) # ESTRELLAS SOLO AQUÍ
+        for s in ESTRELLAS: 
+            s[0] = (s[0] - s[2]*2) % ANCHO
+            pygame.draw.circle(sc, (255,255,255), (int(s[0]), s[1]), 1)
+        # NAVE EN FORMA DE E
+        pygame.draw.rect(sc, (0,200,255), (self.x-20, 350, 40, 10))
+        pygame.draw.rect(sc, (0,200,255), (self.x-20, 335, 8, 15))
+        pygame.draw.rect(sc, (0,200,255), (self.x+12, 335, 8, 15))
+        pygame.draw.rect(sc, (255,255,255), (self.x-2, 330, 4, 20))
+        for e in self.enemigos:
+            pygame.draw.ellipse(sc, (200,100,255), (e[0]-22, e[1]-10, 44, 22))
+            pygame.draw.circle(sc, (200,255,255), (e[0], e[1]-5), 8)
+        for b in self.balas: pygame.draw.rect(sc, (255,255,0), (b[0]-2, b[1], 4, 10))
+
+class JuegoCarreras:
+    def __init__(self):
+        self.x = 400; self.obs = []; self.v = 5; self.vidas = 3; self.flash = 0
+    def actualizar(self, ent, ctrl):
+        if self.flash > 0: self.flash -= 1
+        joy = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
+        if joy:
+            if joy.get_button(ctrl.get("A", {}).get("val", 0)): self.v = min(22, self.v + 0.4)
+            elif joy.get_button(ctrl.get("B", {}).get("val", 1)): self.v = max(0, self.v - 0.8)
+            else: self.v = max(5, self.v - 0.1)
+        if ent == ctrl.get("IZQUIERDA"): self.x = max(200, self.x - 35)
+        elif ent == ctrl.get("DERECHA"): self.x = min(600, self.x + 35)
+        if random.random() < 0.07: self.obs.append([random.randint(210, 590), -100])
+        for o in self.obs[:]:
+            o[1] += int(self.v + 3)
+            if 310 < o[1] < 385 and abs(self.x - o[0]) < 45:
+                self.vidas -= 1; self.flash = 12; self.obs = []; self.v = 5
+            elif o[1] > 450: self.obs.remove(o)
+        return self.vidas <= 0
+    def dibujar(self, sc):
+        sc.fill((34, 139, 34))
+        pygame.draw.rect(sc, (110, 110, 110), (180, 0, 440, 400)) # CARRETERA GRIS
+        pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400))
+        if self.flash > 0: sc.fill((200, 0, 0), special_flags=pygame.BLEND_ADD)
+        pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6)
+        pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12))
+        for o in self.obs: pygame.draw.rect(sc, (255,140,0), (o[0]-20, o[1], 40, 60), border_radius=6)
+
+# ==========================================
+# CONSOLA PRINCIPAL
+# ==========================================
+
+class BBotConsola:
+    def __init__(self):
+        pygame.init(); pygame.joystick.init()
+        self.joy = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
+        if self.joy: self.joy.init()
+        self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.FULLSCREEN | pygame.SCALED)
+        pygame.mouse.set_visible(False)
+        self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
+        self.controles = {}
+        if not os.path.exists(CONFIG_FILE): self.modo = "CONFIG"
+        else:
+            with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
+        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
+        self.idx_cfg = 0; self.seleccion = 0; self.item_idx = 0; self.linea_idx = 0; self.juego = None
+
+    def run(self):
+        while self.running:
+            self.screen.fill(CELESTE_CIELO) # CIELO PARA EL MENÚ
+            t = pygame.time.get_ticks()
+
+            ent = None
+            for ev in pygame.event.get():
+                if ev.type == pygame.QUIT: self.running = False
+                if ev.type == pygame.JOYBUTTONDOWN: ent = {"tipo": "btn", "val": ev.button}
+                if ev.type == pygame.JOYHATMOTION and ev.value != (0,0): ent = {"tipo": "hat", "val": list(ev.value)}
+            
+            if ent == self.controles.get("L"): self.modo = "MENU"; self.juego = None
+
+            if self.modo == "CONFIG":
+                self.mostrar_t("CONFIGURAR BOTON:", y=150, color=(0,0,0), size=30)
+                self.mostrar_t(self.pasos_cfg[self.idx_cfg], y=220, color=(200,0,0), size=45)
+                if ent: 
+                    self.controles[self.pasos_cfg[self.idx_cfg]] = ent
+                    self.idx_cfg += 1
+                    time.sleep(0.3)
+                    if self.idx_cfg >= len(self.pasos_cfg):
+                        with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
+                        self.modo = "MENU"
+
+            elif self.modo == "MENU":
+                self.dibujar_bot(t)
+                opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
+                for i, opt in enumerate(opts):
+                    c = (255,255,255) if self.seleccion == i else (140, 190, 210)
+                    pygame.draw.rect(self.screen, c, (40+i*190, 310, 170, 50), border_radius=15)
+                    self.mostrar_t(opt, 40+i*190+85, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
+                
+                if ent == self.controles.get("DERECHA"): self.seleccion = (self.seleccion+1)%4
+                elif ent == self.controles.get("IZQUIERDA"): self.seleccion = (self.seleccion-1)%4
+                elif ent == self.controles.get("A"): self.modo = opts[self.seleccion]; self.item_idx=0; self.linea_idx=0
+
+            elif self.modo == "JUGAR":
+                if not self.juego:
+                    self.mostrar_t("A: NAVES | B: CARROS", y=200, color=(0,0,0), size=30)
+                    if ent == self.controles.get("A"): self.juego = JuegoNaves()
+                    elif ent == self.controles.get("B"): self.juego = JuegoCarreras()
+                else:
+                    if self.juego.actualizar(ent, self.controles): self.juego = None
+                    else: self.juego.dibujar(self.screen)
+
+            elif self.modo == "CUENTOS":
+                self.dibujar_bot(t, x=680)
+                rect = pygame.Rect(40, 40, 520, 320)
+                pygame.draw.rect(self.screen, (255,255,240), rect, border_radius=15)
+                pygame.draw.rect(self.screen, (100,80,60), rect, 3, border_radius=15)
+                c = CUENTOS[self.item_idx]; f_c = pygame.font.SysFont(FUENTE_RETRO, 18)
+                self.mostrar_t(c[0], 300, 60, (150,0,0), 28)
+                lineas = envolver_texto(c[self.linea_idx+1], f_c, 480)
+                for i, l in enumerate(lineas): self.screen.blit(f_c.render(l, True, (0,0,0)), (60, 110+i*25))
+                if ent == self.controles.get("A"):
+                    self.linea_idx += 1
+                    if self.linea_idx >= len(c)-1: self.linea_idx=0; self.item_idx=(self.item_idx+1)%len(CUENTOS)
+
+            pygame.display.flip(); self.clock.tick(60)
+
+    def mostrar_t(self, txt, x=400, y=200, color=(255,255,255), size=22):
+        f = pygame.font.SysFont(FUENTE_RETRO, size, True)
+        s = f.render(str(txt), True, color)
+        self.screen.blit(s, (x - s.get_width()//2, y))
+
+    def dibujar_bot(self, t, x=400):
+        f = math.sin(t * 0.005) * 12
+        pygame.draw.rect(self.screen, (255,255,255), (x-50, 100+f, 100, 110), border_radius=25)
+        pygame.draw.circle(self.screen, (0,0,0), (x-20, 135+f), 8); pygame.draw.circle(self.screen, (0,0,0), (x+20, 135+f), 8)
+        pygame.draw.rect(self.screen, (0,0,0), (x-15, 155+f, 30, 4), border_radius=2)
+
+if __name__ == "__main__":
+    BBotConsola().run()# JUEGOS
 # ==========================================
 
 class JuegoNaves:
