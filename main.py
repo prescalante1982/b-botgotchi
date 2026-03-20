@@ -7,9 +7,8 @@ import random
 
 # --- CONFIGURACIÓN GLOBAL ---
 COLOR_FONDO = (173, 216, 230) 
-COLOR_TEXTO_DARK = (40, 40, 60)
 CONFIG_FILE = "config_pablo.json"
-FUENTE_RETRO = "Courier New" # Fuente con estilo pixel/monospaced
+FUENTE_RETRO = "Courier New"
 
 def generar_mapa_ancho():
     return [
@@ -31,6 +30,7 @@ class JuegoNaves:
     def __init__(self):
         self.x = 400; self.balas = []; self.enemigos = []
         self.vidas = 3; self.puntos = 0; self.estado = "START"; self.timer_estado = 0
+        self.colores = [(0,200,255), (0,255,100), (200,100,255), (255,150,0)]
         self.estrellas = [[random.randint(0, 800), random.randint(0, 400)] for _ in range(25)]
     
     def actualizar(self, ent, ctrl):
@@ -41,15 +41,17 @@ class JuegoNaves:
         for s in self.estrellas: s[1] = (s[1] + 5) % 400
         if ent == ctrl.get("IZQUIERDA"): self.x = max(30, self.x - 45)
         elif ent == ctrl.get("DERECHA"): self.x = min(770, self.x + 45)
-        elif ent == ctrl.get("X"): self.balas.append([self.x, 340]) # Usamos X para disparar para dejar A/B libres
+        elif ent == ctrl.get("X"): self.balas.append([self.x, 340])
         
         if random.random() < 0.08: 
-            self.enemigos.append([random.randint(50, 750), -40, random.choice([(200,0,255), (0,255,100)])])
+            lvl_idx = (self.puntos // 100) % len(self.colores)
+            self.enemigos.append([random.randint(50, 750), -40, self.colores[lvl_idx]])
+            
         for b in self.balas[:]:
             b[1] -= 20
             if b[1] < 0: self.balas.remove(b)
         for e in self.enemigos[:]:
-            e[1] += 6
+            e[1] += (6 + (self.puntos // 100)) # Más rápido cada nivel
             for b in self.balas[:]:
                 if abs(e[0] - b[0]) < 30 and abs(e[1] - b[1]) < 30:
                     if e in self.enemigos: self.enemigos.remove(e)
@@ -63,23 +65,18 @@ class JuegoNaves:
     def dibujar(self, sc):
         sc.fill((10, 10, 30))
         for s in self.estrellas: pygame.draw.circle(sc, (255, 255, 255), s, 1)
-        c = (0, 200, 255)
+        lvl_idx = (self.puntos // 100) % len(self.colores)
+        c = self.colores[lvl_idx]
         pygame.draw.rect(sc, c, (self.x-20, 350, 40, 10)) 
-        pygame.draw.rect(sc, c, (self.x-20, 335, 8, 15))  
-        pygame.draw.rect(sc, c, (self.x+12, 335, 8, 15))  
         pygame.draw.rect(sc, (255, 255, 255), (self.x-2, 330, 4, 20)) 
         for b in self.balas: pygame.draw.rect(sc, (255, 255, 0), (b[0]-2, b[1], 4, 10))
         for e in self.enemigos:
             pygame.draw.ellipse(sc, e[2], (e[0]-22, e[1]-10, 44, 22)) 
-            pygame.draw.circle(sc, (200, 255, 255), (e[0], e[1]-5), 8) 
         self.mostrar_hud(sc)
 
     def mostrar_hud(self, sc):
         font = pygame.font.SysFont(FUENTE_RETRO, 22, True)
-        if self.estado == "START":
-            txt = font.render(f"VIDA {4 - self.vidas}", True, (255, 255, 0))
-            sc.blit(txt, (400 - txt.get_width()//2, 180))
-        sc.blit(font.render(f"HP: {self.vidas}", True, (255, 50, 50)), (20, 20))
+        sc.blit(font.render(f"HP:{self.vidas}", True, (255, 50, 50)), (20, 20))
         pts_txt = font.render(f"SCORE:{self.puntos}", True, (255, 255, 255))
         sc.blit(pts_txt, (780 - pts_txt.get_width(), 20))
 
@@ -94,33 +91,31 @@ class JuegoCarreras:
             if self.timer > 60: self.estado = "JUGANDO"; self.timer = 0
             return False
         
-        # Sistema de Aceleración y Freno
-        # Usamos pygame.joystick directamente para detectar si el botón está presionado continuamente
         joy = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
         if joy:
             btn_a = ctrl.get("A", {}).get("val")
             btn_b = ctrl.get("B", {}).get("val")
-            if btn_a is not None and joy.get_button(btn_a): self.v = min(25, self.v + 0.5)
+            if btn_a is not None and joy.get_button(btn_a): self.v = min(22, self.v + 0.4)
             elif btn_b is not None and joy.get_button(btn_b): self.v = max(0, self.v - 0.8)
-            else: self.v = max(5, self.v - 0.1) # Deceleración natural
+            else: self.v = max(5, self.v - 0.1)
 
         self.distancia += int(self.v / 5)
         if self.distancia >= self.meta:
             self.nivel += 1; self.meta += 500; self.estado = "START"; self.obs = []; return False
 
-        if ent == ctrl.get("IZQUIERDA"): self.x = max(200, self.x - 30)
-        elif ent == ctrl.get("DERECHA"): self.x = min(600, self.x + 30)
+        if ent == ctrl.get("IZQUIERDA"): self.x = max(210, self.x - 35)
+        elif ent == ctrl.get("DERECHA"): self.x = min(590, self.x + 35)
         
-        if random.random() < 0.07: 
-            nx = random.randint(210, 590)
-            if not any(abs(nx - o[0]) < 60 and o[1] < 100 for o in self.obs):
-                self.obs.append([nx, -80, random.choice([(0,255,100), (255,150,0), (200,100,255)])])
+        if random.random() < 0.06: 
+            nx = random.randint(220, 580)
+            if not any(abs(nx - o[0]) < 70 and o[1] < 150 for o in self.obs):
+                self.obs.append([nx, -100, random.choice([(0,255,100), (255,150,0), (200,100,255)])])
         
         for o in self.obs[:]:
-            o[1] += int(self.v + 2)
-            if 320 < o[1] < 380 and abs(self.x - o[0]) < 45:
+            o[1] += int(self.v + 3) # Velocidad relativa corregida
+            if 310 < o[1] < 385 and abs(self.x - o[0]) < 45:
                 self.vidas -= 1; self.v = 5; self.obs = []; self.estado = "START"; self.timer = 0
-            elif o[1] > 400: self.obs.remove(o)
+            elif o[1] > 450: self.obs.remove(o)
         return self.vidas <= 0
 
     def dibujar(self, sc):
@@ -128,11 +123,8 @@ class JuegoCarreras:
         pygame.draw.rect(sc, (60, 60, 60), (180, 0, 440, 400)) 
         pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400)) 
         # Carro Pablo
-        for lx, ly in [(-26, 335), (18, 335), (-26, 370), (18, 370)]:
-            pygame.draw.rect(sc, (0,0,0), (self.x + lx, ly, 8, 12))
         pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6)
         pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12)) 
-        
         for o in self.obs:
             pygame.draw.rect(sc, o[2], (o[0]-20, o[1], 40, 60), border_radius=6)
             
@@ -140,20 +132,15 @@ class JuegoCarreras:
         sc.blit(font.render(f"LVL:{self.nivel}", True, (255, 255, 255)), (20, 20))
         meta_txt = font.render(f"DIST:{self.distancia}/{self.meta}m", True, (255, 255, 0))
         sc.blit(meta_txt, (780 - meta_txt.get_width(), 20))
-        sc.blit(font.render(f"VEL:{int(self.v*10)}km/h", True, (255, 255, 255)), (20, 360))
 
 class JuegoPacman:
     def __init__(self):
         self.mapa = generar_mapa_ancho()
         self.px, self.py = 1, 1; self.pts = []; self.vidas = 3; self.puntos = 0
-        self.estado = "START"; self.timer = 0; self.nivel = 1; self.frame = 0
-        self.cargar_puntos()
-        self.fx, self.fy = 6, 13; self.paso_f = 0
+        self.estado = "START"; self.timer = 0; self.nivel = 1; self.frame = 0; self.dir = "D"
+        self.cargar_puntos(); self.fx, self.fy = 6, 13; self.paso_f = 0
     def cargar_puntos(self):
-        self.pts = []
-        for r in range(8):
-            for c in range(15):
-                if self.mapa[r][c] == 0: self.pts.append([r, c])
+        self.pts = [[r, c] for r in range(8) for c in range(15) if self.mapa[r][c] == 0]
     def actualizar(self, ent, ctrl):
         if self.estado == "START":
             self.timer += 1
@@ -161,17 +148,16 @@ class JuegoPacman:
             return False
         self.frame += 1
         nx, ny = self.px, self.py
-        if ent == ctrl.get("IZQUIERDA"): ny -= 1
-        elif ent == ctrl.get("DERECHA"): ny += 1
-        elif ent == ctrl.get("ARRIBA"): nx -= 1
-        elif ent == ctrl.get("ABAJO"): nx += 1
+        if ent == ctrl.get("IZQUIERDA"): ny -= 1; self.dir = "I"
+        elif ent == ctrl.get("DERECHA"): ny += 1; self.dir = "D"
+        elif ent == ctrl.get("ARRIBA"): nx -= 1; self.dir = "A"
+        elif ent == ctrl.get("ABAJO"): nx += 1; self.dir = "B"
         if 0 <= nx < 8 and 0 <= ny < 15 and self.mapa[nx][ny] == 0:
             self.px, self.py = nx, ny
         if [self.px, self.py] in self.pts: 
             self.pts.remove([self.px, self.py]); self.puntos += 10
         if not self.pts:
             self.nivel += 1; self.cargar_puntos(); self.estado = "START"; self.timer = 0
-        
         self.paso_f += 1
         if self.paso_f > 12: 
             self.paso_f = 0
@@ -185,36 +171,31 @@ class JuegoPacman:
 
     def dibujar(self, sc):
         sc.fill((0,0,20))
-        # Laberinto con paredes sólidas
         for r in range(8):
             for c in range(15):
                 x, y = 25 + c*50, 10 + r*50
                 if self.mapa[r][c] == 1: 
-                    pygame.draw.rect(sc, (0,50,180), (x, y, 50, 50))
-                    pygame.draw.rect(sc, (0,80,255), (x+2, y+2, 46, 46), 1)
+                    pygame.draw.rect(sc, (0,50,180), (x+10, y+10, 30, 30), border_radius=4) # Paredes más pequeñas
                 elif [r,c] in self.pts: pygame.draw.circle(sc, (255, 255, 200), (x+25, y+25), 4)
         
-        # Pacman animado con boca y ojo
         px, py = 25 + self.py*50 + 25, 10 + self.px*50 + 25
-        pygame.draw.circle(sc, (255, 255, 0), (px, py), 20)
-        # Boca (animación simple)
+        pygame.draw.circle(sc, (255, 255, 0), (px, py), 18)
         if (self.frame // 10) % 2 == 0:
-            pygame.draw.polygon(sc, (0,0,20), [(px, py), (px+22, py-12), (px+22, py+12)])
-        pygame.draw.circle(sc, (0,0,0), (px+5, py-10), 3) # Ojo
+            puntos_boca = {"D": [(px, py), (px+20, py-10), (px+20, py+10)],
+                           "I": [(px, py), (px-20, py-10), (px-20, py+10)],
+                           "A": [(px, py), (px-10, py-20), (px+10, py-20)],
+                           "B": [(px, py), (px-10, py+20), (px+10, py+20)]}
+            pygame.draw.polygon(sc, (0,0,20), puntos_boca[self.dir])
         
-        # Fantasma
         fx, fy = 25 + self.fy*50 + 12, 10 + self.fx*50 + 12
-        pygame.draw.rect(sc, (255, 50, 50), (fx, fy+12, 26, 14)) 
         pygame.draw.circle(sc, (255, 50, 50), (fx+13, fy+13), 13) 
-        pygame.draw.circle(sc, (255, 255, 255), (fx+7, fy+10), 4); pygame.draw.circle(sc, (255, 255, 255), (fx+19, fy+10), 4)
-        
         font = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(font.render(f"HP:{self.vidas}", True, (255, 255, 255)), (20, 20))
         pts_txt = font.render(f"SCORE:{self.puntos}", True, (255, 255, 0))
         sc.blit(pts_txt, (780 - pts_txt.get_width(), 20))
 
 # ==========================================
-# CONSOLA PRINCIPAL
+# CONSOLA PRINCIPAL (Mantiene lógica anterior)
 # ==========================================
 
 class BBotConsola:
@@ -268,7 +249,7 @@ class BBotConsola:
 
             elif self.modo == "JUGAR":
                 if self.sub_modo == "MENU_JUEGOS":
-                    self.mostrar_texto("ARCADE CENTER", y=40, color=COLOR_TEXTO_DARK, size=35)
+                    self.mostrar_texto("ARCADE CENTER", y=40, color=(40,40,60), size=35)
                     jgs = ["NAVES", "CARRERAS", "PAC-MAN"]
                     for i, jg in enumerate(jgs):
                         col = (255, 100, 0) if self.sel_juego == i else (100, 100, 120)
