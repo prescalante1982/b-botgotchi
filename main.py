@@ -5,7 +5,7 @@ import time
 import math
 from utils import obtener_chiste, generar_laberinto
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN VISUAL ---
 COLOR_FONDO = (20, 20, 40)
 COLOR_NEON = (0, 255, 200)
 COLOR_TEXTO = (255, 255, 255)
@@ -17,60 +17,89 @@ class BBotConsola:
         pygame.init()
         pygame.joystick.init()
         self.screen = pygame.display.set_mode((800, 400))
+        pygame.display.set_caption("B-Botgotchi v3.0 - Pablo Alí")
         self.clock = pygame.time.Clock()
         self.running = True
         
-        # Mando
+        # Inicialización de Mando
+        self.joy = None
         if pygame.joystick.get_count() > 0:
-            self.joy = pygame.joystick.Joystick(0); self.joy.init()
+            self.joy = pygame.joystick.Joystick(0)
+            self.joy.init()
 
-        # Configuración inicial
+        # Configuración de Controles
+        self.controles = {}
+        self.pasos_config = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "BOTON 1", "BOTON 4"]
+        self.indice_cfg = 0
+        
         if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
+            with open(CONFIG_FILE, 'r') as f:
+                self.controles = json.load(f)
             self.modo = "MENU"
-        else: self.modo = "CONFIG"
+        else:
+            self.modo = "CONFIG"
 
+        # Variables de Estado
         self.opciones = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
         self.seleccion = 0
-        self.hambre = 50; self.energia = 50
-        self.estado_bot = "NORMAL"; self.timer_emo = 0
+        self.hambre = 50
+        self.energia = 50
+        self.estado_bot = "NORMAL"
+        self.timer_emo = 0
+        self.menu_activo = None # "COMIDA" o "ENERGIA"
+        self.sel_sub = 0
         
-        # --- NUEVAS VARIABLES PARA CUENTOS ---
+        # Variables de Cuentos (Locales)
         self.lista_cuentos = []
         self.sel_cuento_idx = 0
         self.lineas_cuento = []
-        self.scroll_y = 0 # Para navegar arriba/abajo
-        self.modo_lectura = "LISTA" # LISTA o LEYENDO
+        self.scroll_y = 0
+        self.modo_lectura = "LISTA" # "LISTA" o "LEYENDO"
+        self.texto_pantalla = "¡HOLA PABLO ALÍ!"
+        
+        # Variables de Juego
+        self.mapa = []
+        self.px = self.py = 0
 
     def cargar_lista_tales(self):
-        if not os.path.exists(TALES_DIR): os.makedirs(TALES_DIR)
+        if not os.path.exists(TALES_DIR):
+            os.makedirs(TALES_DIR)
         archivos = [f for f in os.listdir(TALES_DIR) if f.endswith(".txt")]
-        return archivos if archivos else ["No hay cuentos.txt"]
+        return archivos if archivos else []
 
     def cargar_contenido_cuento(self, nombre_archivo):
         ruta = os.path.join(TALES_DIR, nombre_archivo)
         try:
             with open(ruta, 'r', encoding='utf-8') as f:
                 return f.readlines()
-        except: return ["Error al abrir el archivo."]
+        except:
+            return ["Error: No se pudo leer el archivo."]
 
-    def mostrar_texto_centrado(self, txt, y, color=COLOR_TEXTO, size=22):
+    def cambiar_emo(self, emo, seg=2):
+        self.estado_bot = emo
+        self.timer_emo = time.time() + seg
+
+    def mostrar_texto(self, txt, x=400, y=200, color=COLOR_TEXTO, size=22, centrar=True):
         font = pygame.font.SysFont("Arial", size, True)
         s = font.render(str(txt), True, color)
-        self.screen.blit(s, (400 - s.get_width()//2, y))
+        pos = (x - s.get_width()//2, y) if centrar else (x, y)
+        self.screen.blit(s, pos)
 
-    def dibujar_bot(self, t, x=400, y_base=130):
+    def dibujar_bot(self, t, x=400, y_base=130, escala=1.0):
         f = math.sin(t * 0.005) * 10
         cx, cy = x, y_base + f
-        pygame.draw.rect(self.screen, (255,255,255), (cx-50, cy-60, 100, 110), border_radius=30)
-        pygame.draw.rect(self.screen, (20,20,30), (cx-35, cy-35, 70, 50), border_radius=10)
+        # Cuerpo
+        pygame.draw.rect(self.screen, (255,255,255), (cx-50*escala, cy-60*escala, 100*escala, 110*escala), border_radius=int(30*escala))
+        # Pantalla cara
+        pygame.draw.rect(self.screen, (20,20,30), (cx-35*escala, cy-35*escala, 70*escala, 50*escala), border_radius=int(10*escala))
+        
         col = (255,255,0) if self.estado_bot == "RISA" else COLOR_NEON
         if self.estado_bot == "SUEÑO":
-            pygame.draw.line(self.screen, (100,100,255), (cx-20, cy-15), (cx-5, cy-15), 4)
-            pygame.draw.line(self.screen, (100,100,255), (cx+5, cy-15), (cx+20, cy-15), 4)
+            pygame.draw.line(self.screen, (100,100,255), (cx-20*escala, cy-15*escala), (cx-5*escala, cy-15*escala), 4)
+            pygame.draw.line(self.screen, (100,100,255), (cx+5*escala, cy-15*escala), (cx+20*escala, cy-15*escala), 4)
         else:
-            pygame.draw.circle(self.screen, col, (cx-15, cy-15), 8)
-            pygame.draw.circle(self.screen, col, (cx+15, cy-15), 8)
+            pygame.draw.circle(self.screen, col, (int(cx-15*escala), int(cy-15*escala)), int(8*escala))
+            pygame.draw.circle(self.screen, col, (int(cx+15*escala), int(cy-15*escala)), int(8*escala))
 
     def run(self):
         while self.running:
@@ -78,97 +107,36 @@ class BBotConsola:
             if time.time() > self.timer_emo: self.estado_bot = "NORMAL"
             self.screen.fill(COLOR_FONDO)
 
+            # --- MODO CONFIGURACIÓN ---
             if self.modo == "CONFIG":
-                self.mostrar_texto_centrado("MODO CONFIGURACIÓN", 150)
-            
+                self.mostrar_texto("CONFIGURACIÓN DE MANDO", y=100, color=COLOR_NEON, size=30)
+                self.mostrar_texto(f"PABLO, PRESIONA: {self.pasos_config[self.indice_cfg]}", y=200, size=26)
+
+            # --- MODO MENÚ PRINCIPAL ---
             elif self.modo == "MENU":
                 self.dibujar_bot(t)
                 for i, opt in enumerate(self.opciones):
                     sel = (self.seleccion == i)
                     c = (255,200,0) if sel else (60,60,90)
                     pygame.draw.rect(self.screen, c, (40+i*190, 310, 170, 50), border_radius=15)
-                    txt = pygame.font.SysFont("Arial", 18, True).render(opt, True, (0,0,0) if sel else (255,255,255))
-                    self.screen.blit(txt, (125+i*190-txt.get_width()//2, 322))
+                    txt_btn = pygame.font.SysFont("Arial", 18, True).render(opt, True, (0,0,0) if sel else (255,255,255))
+                    self.screen.blit(txt_btn, (125+i*190-txt_btn.get_width()//2, 322))
 
+            # --- MODO CUENTOS ---
             elif self.modo == "CUENTOS":
                 if self.modo_lectura == "LISTA":
-                    self.mostrar_texto_centrado("BIBLIOTECA DE PABLO ALÍ", 40, COLOR_NEON, 28)
-                    for i, cuento in enumerate(self.lista_cuentos):
-                        col = (255, 255, 0) if self.sel_cuento_idx == i else (150, 150, 150)
-                        self.mostrar_texto_centrado(cuento.replace(".txt",""), 120 + i*40, col, 24)
+                    self.mostrar_texto("BIBLIOTECA", y=40, color=COLOR_NEON, size=30)
+                    if not self.lista_cuentos:
+                        self.mostrar_texto("No hay archivos .txt en /.tales", y=200, color=(200,50,50))
+                    else:
+                        for i, cuento in enumerate(self.lista_cuentos):
+                            col = (255, 255, 0) if self.sel_cuento_idx == i else (150, 150, 150)
+                            self.mostrar_texto(cuento.replace(".txt","").upper(), y=120+i*40, color=col, size=24)
                 
                 elif self.modo_lectura == "LEYENDO":
-                    # B-Bot a la izquierda
-                    self.dibujar_bot(t, x=150, y_base=200)
-                    # Cuadro de lectura a la derecha
-                    rect_lector = pygame.Rect(280, 40, 480, 320)
-                    pygame.draw.rect(self.screen, (40, 40, 80), rect_lector, border_radius=15)
-                    pygame.draw.rect(self.screen, COLOR_NEON, rect_lector, 3, border_radius=15)
+                    self.dibujar_bot(t, x=140, y_base=200, escala=0.9)
+                    rect_txt = pygame.Rect(280, 40, 480, 320)
+                    pygame.draw.rect(self.screen, (30, 30, 60), rect_txt, border_radius=15)
+                    pygame.draw.rect(self.screen, COLOR_NEON, rect_txt, 2, border_radius=15)
                     
-                    # Renderizar texto con Scroll
-                    font_cuento = pygame.font.SysFont("Arial", 22)
-                    for i, linea in enumerate(self.lineas_cuento):
-                        y_pos = 60 + (i * 30) - (self.scroll_y * 30)
-                        if 50 < y_pos < 330: # Solo dibujar lo que cabe en el cuadro
-                            txt_surf = font_cuento.render(linea.strip(), True, COLOR_TEXTO)
-                            self.screen.blit(txt_surf, (300, y_pos))
-
-            elif self.modo == "MASCOTA":
-                self.dibujar_bot(t); self.mostrar_texto_centrado(f"H: {self.hambre}% E: {self.energia}%", 280)
-
-            elif self.modo == "JUGAR":
-                for r in range(8):
-                    for c in range(8):
-                        col = (40,40,60) if self.mapa[r][c] == 1 else (200,200,200)
-                        pygame.draw.rect(self.screen, col, (240+c*40, 40+r*40, 38, 38), border_radius=5)
-                pygame.draw.circle(self.screen, COLOR_NEON, (240+self.py*40+20, 40+self.px*40+20), 15)
-
-            elif self.modo == "CHISTES":
-                self.dibujar_bot(t); self.mostrar_texto_centrado(self.texto_pantalla, 250)
-
-            # --- EVENTOS ---
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT: self.running = False
-                entrada = None
-                if event.type == pygame.JOYBUTTONDOWN: entrada = {"tipo": "btn", "val": event.button}
-                elif event.type == pygame.JOYHATMOTION and event.value != (0,0): entrada = {"tipo": "hat", "val": list(event.value)}
-
-                if entrada:
-                    if self.modo == "CONFIG":
-                        self.controles[self.pasos_config[self.indice_cfg]] = entrada
-                        self.indice_cfg += 1
-                        if self.indice_cfg >= len(self.pasos_config):
-                            with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
-                            self.modo = "MENU"
-                    
-                    elif entrada == self.controles.get("BOTON 4"): 
-                        if self.modo_lectura == "LEYENDO": self.modo_lectura = "LISTA"
-                        else: self.modo = "MENU"
-
-                    elif self.modo == "MENU":
-                        if entrada == self.controles.get("DERECHA"): self.seleccion = (self.seleccion+1)%4
-                        elif entrada == self.controles.get("IZQUIERDA"): self.seleccion = (self.seleccion-1)%4
-                        elif entrada == self.controles.get("BOTON 1"):
-                            self.modo = self.opciones[self.seleccion]
-                            if self.modo == "CUENTOS": 
-                                self.lista_cuentos = self.cargar_lista_tales()
-                                self.modo_lectura = "LISTA"
-                            elif self.modo == "CHISTES": self.texto_pantalla = obtener_chiste()
-                            elif self.modo == "JUGAR": self.mapa = generar_laberinto(); self.px = self.py = 0
-
-                    elif self.modo == "CUENTOS":
-                        if self.modo_lectura == "LISTA":
-                            if entrada == self.controles.get("ABAJO"): self.sel_cuento_idx = (self.sel_cuento_idx + 1) % len(self.lista_cuentos)
-                            elif entrada == self.controles.get("ARRIBA"): self.sel_cuento_idx = (self.sel_cuento_idx - 1) % len(self.lista_cuentos)
-                            elif entrada == self.controles.get("BOTON 1"):
-                                self.lineas_cuento = self.cargar_contenido_cuento(self.lista_cuentos[self.sel_cuento_idx])
-                                self.scroll_y = 0; self.modo_lectura = "LEYENDO"
-                        elif self.modo_lectura == "LEYENDO":
-                            if entrada == self.controles.get("ABAJO"): self.scroll_y += 1
-                            elif entrada == self.controles.get("ARRIBA"): self.scroll_y = max(0, self.scroll_y - 1)
-
-            pygame.display.flip()
-            self.clock.tick(60)
-
-if __name__ == "__main__":
-    BBotConsola().run()
+                    font_c = pygame.font.SysFont("
