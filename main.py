@@ -17,16 +17,15 @@ class BBotConsola:
         pygame.init()
         pygame.joystick.init()
         self.screen = pygame.display.set_mode((800, 400))
-        pygame.display.set_caption("B-Botgotchi v3.2 - Pablo Alí")
+        pygame.display.set_caption("B-Botgotchi v3.3 - Pablo Alí")
         self.clock = pygame.time.Clock()
         self.running = True
         
-        # Inicialización de Mando
         self.joy = None
         if pygame.joystick.get_count() > 0:
             self.joy = pygame.joystick.Joystick(0)
             self.joy.init()
-            print(f"Mando detectado: {self.joy.get_name()}")
+            print(f"Mando en Modo A detectado: {self.joy.get_name()}")
 
         self.controles = {}
         self.pasos_config = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "BOTON 1", "BOTON 4"]
@@ -38,7 +37,7 @@ class BBotConsola:
         else:
             self.modo = "CONFIG"
 
-        # Estados y Mascota
+        # Estados
         self.opciones = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
         self.seleccion = 0
         self.hambre = 50; self.energia = 50
@@ -92,9 +91,9 @@ class BBotConsola:
             self.screen.fill(COLOR_FONDO)
 
             if self.modo == "CONFIG":
-                self.mostrar_texto("CONFIGURACIÓN UNIVERSAL", y=60, color=COLOR_NEON, size=30)
+                self.mostrar_texto("MODO COMPATIBILIDAD A", y=60, color=COLOR_NEON, size=30)
                 self.mostrar_texto(f"PABLO, PRESIONA: {self.pasos_config[self.indice_cfg]}", y=180, size=28)
-                self.mostrar_texto("Mueve la cruz o la palanca", y=280, size=18, color=(150,150,150))
+                self.mostrar_texto("Usa la cruz o las palancas", y=280, size=18, color=(150,150,150))
 
             elif self.modo == "MENU":
                 self.dibujar_bot(t)
@@ -143,7 +142,7 @@ class BBotConsola:
             elif self.modo == "CHISTES":
                 self.dibujar_bot(t); self.mostrar_texto(self.texto_pantalla, y=260, size=20)
 
-            # --- GESTIÓN DE EVENTOS UNIVERSAL ---
+            # --- EVENTOS MEJORADOS ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: self.running = False
                 entrada = None
@@ -153,18 +152,19 @@ class BBotConsola:
                 elif event.type == pygame.JOYHATMOTION:
                     if event.value != (0, 0): entrada = {"tipo": "hat", "val": list(event.value)}
                 elif event.type == pygame.JOYAXISMOTION:
-                    if abs(event.value) > 0.6: # Umbral de sensibilidad
+                    # Umbral bajo para detectar movimientos sutiles del modo A
+                    if abs(event.value) > 0.4: 
                         entrada = {"tipo": "axis", "val": [event.axis, 1 if event.value > 0 else -1]}
 
                 if entrada:
                     if self.modo == "CONFIG":
                         self.controles[self.pasos_config[self.indice_cfg]] = entrada
-                        print(f"DEBUG: {self.pasos_config[self.indice_cfg]} -> {entrada}")
+                        print(f"DEBUG: {self.pasos_config[self.indice_cfg]} detectado como {entrada}")
                         self.indice_cfg += 1
                         if self.indice_cfg >= len(self.pasos_config):
                             with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
                             self.modo = "MENU"
-                        pygame.time.wait(500)
+                        pygame.time.wait(600) # Más tiempo para evitar rebote
                     
                     elif entrada == self.controles.get("BOTON 4"):
                         if self.modo == "CUENTOS" and self.modo_lectura == "LEYENDO": self.modo_lectura = "LISTA"
