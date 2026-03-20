@@ -7,11 +7,13 @@ import random
 
 # --- CONFIGURACIÓN ---
 ANCHO, ALTO = 800, 400
-COLOR_FONDO = (173, 216, 230)
+COLOR_FONDO = (10, 10, 30) # Fondo oscuro para que brillen las estrellas
 CONFIG_FILE = "config_pablo.json"
 FUENTE_RETRO = "Courier New"
 
-# --- CONTENIDO ---
+# --- GENERACIÓN DE ESTRELLAS ---
+ESTRELLAS = [[random.randint(0, ANCHO), random.randint(0, ALTO), random.random()] for _ in range(60)]
+
 CUENTOS = [
     ["El Caballero de la E", 
      "Había una vez un valiente piloto llamado Pablo Alí que viajaba en una nave con forma de letra E.",
@@ -61,14 +63,15 @@ class JuegoNaves:
         return False
     def dibujar(self, sc):
         sc.fill((10,10,30))
+        # Estrellas de fondo
+        for s in ESTRELLAS: pygame.draw.circle(sc, (255,255,255), (s[0], s[1]), 1)
         c = self.colores[(self.puntos//100)%len(self.colores)]
-        # NAVE EN E
-        pygame.draw.rect(sc, c, (self.x-20, 350, 40, 10))
+        pygame.draw.rect(sc, c, (self.x-20, 350, 40, 10)) # Base E
         pygame.draw.rect(sc, c, (self.x-20, 335, 8, 15)); pygame.draw.rect(sc, c, (self.x+12, 335, 8, 15))
-        pygame.draw.rect(sc, (255,255,255), (self.x-2, 330, 4, 20))
+        pygame.draw.rect(sc, (255,255,255), (self.x-2, 330, 4, 20)) # Cañón
         for e in self.enemigos:
             pygame.draw.ellipse(sc, e[2], (e[0]-22, e[1]-10, 44, 22))
-            pygame.draw.circle(sc, (200,255,255), (e[0], e[1]-5), 8) # CÚPULA UFO
+            pygame.draw.circle(sc, (200,255,255), (e[0], e[1]-5), 8) # Cúpula UFO
         for b in self.balas: pygame.draw.rect(sc, (255,255,0), (b[0]-2, b[1], 4, 10))
         f = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(f.render(f"PABLO ALI - SCORE: {self.puntos} - HP: {self.vidas}", True, (255,255,255)), (20,20))
@@ -80,7 +83,6 @@ class JuegoCarreras:
         if self.flash > 0: self.flash -= 1
         joy = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
         if joy:
-            # Lógica corregida de aceleración continua
             if joy.get_button(ctrl.get("A", {}).get("val", 0)): self.v = min(22, self.v + 0.4)
             elif joy.get_button(ctrl.get("B", {}).get("val", 1)): self.v = max(0, self.v - 0.8)
             else: self.v = max(5, self.v - 0.1)
@@ -95,26 +97,25 @@ class JuegoCarreras:
         return self.vidas <= 0
     def dibujar(self, sc):
         sc.fill((34, 139, 34))
-        pygame.draw.rect(sc, (110, 110, 110), (180, 0, 440, 400)) # CARRETERA GRIS CLARO
+        pygame.draw.rect(sc, (110, 110, 110), (180, 0, 440, 400)) # Carretera Gris Claro
         pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400))
         if self.flash > 0: sc.fill((200, 0, 0), special_flags=pygame.BLEND_ADD)
-        # CARRO CON VIDRIO
-        pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6)
-        pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12)) 
+        pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6) # Carro
+        pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12)) # Vidrio
         for o in self.obs: 
             pygame.draw.rect(sc, o[2], (o[0]-20, o[1], 40, 60), border_radius=6)
             pygame.draw.rect(sc, (255,255,255), (o[0]-12, o[1]+10, 24, 12))
-        f = pygame.font.SysFont(FUENTE_RETRO, 25 if self.flash > 0 else 20, True)
-        sc.blit(f.render(f"VIDAS: {self.vidas}", True, (255,255,255)), (20,20))
+        f = pygame.font.SysFont(FUENTE_RETRO, 20, True)
+        sc.blit(f.render(f"HP: {self.vidas}", True, (255,255,255)), (20,20))
 
 class JuegoPacman:
     def __init__(self):
         self.mapa = [
             [1,1,1,1,1,1,0,1,1,1,1,1,1,1,1],
             [1,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
-            [0,0,1,1,1,0,1,1,1,0,1,1,1,0,0], # TÚNELES LATERALES
+            [0,0,1,1,1,0,1,1,1,0,1,1,1,0,0], # Túneles
             [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
-            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], # TÚNEL CENTRAL
+            [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], # Túnel central
             [1,0,1,1,1,1,0,0,0,1,1,1,1,0,1],
             [1,1,1,1,1,1,0,1,1,1,1,1,1,1,1]
         ]
@@ -127,7 +128,6 @@ class JuegoPacman:
         elif ent == ctrl.get("DERECHA"): ny += 1; self.dir = "D"
         elif ent == ctrl.get("ARRIBA"): nx -= 1; self.dir = "A"
         elif ent == ctrl.get("ABAJO"): nx += 1; self.dir = "B"
-        # WRAPAROUND (ATAJOS)
         if ny < 0: ny = 14
         elif ny > 14: ny = 0
         if nx < 0: nx = len(self.mapa)-1
@@ -151,7 +151,6 @@ class JuegoPacman:
                 if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0,50,180), (x+5, y+5, 40, 40), border_radius=8)
                 elif [r,c] in self.pts: pygame.draw.circle(sc, (255,255,200), (x+25, y+25), 4)
         px, py = 25+self.py*50+25, 25+self.px*50+25
-        # PACMAN CON OJO Y BOCA
         pygame.draw.circle(sc, (255,255,0), (px, py), 18)
         pygame.draw.circle(sc, (0,0,0), (px+5, py-8), 3)
         if (self.frame // 10) % 2 == 0:
@@ -160,12 +159,12 @@ class JuegoPacman:
             pygame.draw.polygon(sc, (0,0,20), pts_b[self.dir])
         for f in self.fantasmas:
             fx, fy = 25+f['y']*50+12, 25+f['x']*50+12
-            pygame.draw.circle(sc, f['c'], (fx+13, fy+13), 15) # FORMA U
+            pygame.draw.circle(sc, f['c'], (fx+13, fy+13), 15)
             pygame.draw.rect(sc, f['c'], (fx-2, fy+13, 30, 15))
             pygame.draw.circle(sc, (255,255,255), (fx+7, fy+10), 4); pygame.draw.circle(sc, (255,255,255), (fx+19, fy+10), 4)
 
 # ==========================================
-# CONSOLA
+# CONSOLA CENTRAL
 # ==========================================
 
 class BBotConsola:
@@ -184,7 +183,15 @@ class BBotConsola:
 
     def run(self):
         while self.running:
-            self.screen.fill(COLOR_FONDO); t = pygame.time.get_ticks(); ent = None
+            # Dibujamos estrellas siempre en el fondo (Menú y Cuentos)
+            self.screen.fill(COLOR_FONDO)
+            t = pygame.time.get_ticks()
+            for s in ESTRELLAS:
+                # Movimiento suave de estrellas
+                s[0] = (s[0] - s[2]*2) % ANCHO
+                pygame.draw.circle(self.screen, (255,255,255), (int(s[0]), int(s[1])), 1)
+
+            ent = None
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
                 if ev.type == pygame.JOYBUTTONDOWN: ent = {"tipo": "btn", "val": ev.button}
@@ -222,13 +229,13 @@ class BBotConsola:
                     else: self.juego.dibujar(self.screen)
 
             elif self.modo == "CUENTOS":
-                self.dibujar_bot(t, x=680) # BOT A LA DERECHA
+                self.dibujar_bot(t, x=680)
                 rect = pygame.Rect(40, 40, 520, 320)
                 pygame.draw.rect(self.screen, (255,255,240), rect, border_radius=15)
                 pygame.draw.rect(self.screen, (100,80,60), rect, 3, border_radius=15)
                 c = CUENTOS[self.item_idx]; f_c = pygame.font.SysFont(FUENTE_RETRO, 18)
                 self.mostrar_t(c[0], 300, 60, (150,0,0), 28)
-                lineas = envolver_texto(c[self.linea_idx+1], f_c, 480) # WORD WRAP
+                lineas = envolver_texto(c[self.linea_idx+1], f_c, 480)
                 for i, l in enumerate(lineas): self.screen.blit(f_c.render(l, True, (0,0,0)), (60, 110+i*25))
                 if ent == self.controles.get("A"):
                     self.linea_idx += 1
@@ -236,7 +243,7 @@ class BBotConsola:
 
             elif self.modo == "CHISTES":
                 self.dibujar_bot(t, x=150)
-                self.mostrar_t(CHISTES[self.item_idx], y=200, color=(0,0,0), size=20)
+                self.mostrar_t(CHISTES[self.item_idx], y=200, color=(255,255,255), size=20)
                 if ent == self.controles.get("A"): self.item_idx = (self.item_idx+1)%len(CHISTES)
 
             pygame.display.flip(); self.clock.tick(60)
