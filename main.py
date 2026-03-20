@@ -17,7 +17,7 @@ class BBotConsola:
         pygame.init()
         pygame.joystick.init()
         self.screen = pygame.display.set_mode((800, 400))
-        pygame.display.set_caption("B-Botgotchi v3.1 - Pablo Alí")
+        pygame.display.set_caption("B-Botgotchi v3.2 - Pablo Alí")
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -28,53 +28,39 @@ class BBotConsola:
             self.joy.init()
             print(f"Mando detectado: {self.joy.get_name()}")
 
-        # Configuración de Controles
         self.controles = {}
         self.pasos_config = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "BOTON 1", "BOTON 4"]
         self.indice_cfg = 0
         
         if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f:
-                self.controles = json.load(f)
+            with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
             self.modo = "MENU"
         else:
             self.modo = "CONFIG"
 
-        # Variables de Estado
+        # Estados y Mascota
         self.opciones = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
         self.seleccion = 0
-        self.hambre = 50
-        self.energia = 50
-        self.estado_bot = "NORMAL"
-        self.timer_emo = 0
-        self.menu_activo = None 
-        self.sel_sub = 0
+        self.hambre = 50; self.energia = 50
+        self.estado_bot = "NORMAL"; self.timer_emo = 0
+        self.menu_activo = None; self.sel_sub = 0
         
-        # Cuentos Locales
-        self.lista_cuentos = []
-        self.sel_cuento_idx = 0
-        self.lineas_cuento = []
-        self.scroll_y = 0
-        self.modo_lectura = "LISTA" 
-        self.texto_pantalla = "¡HOLA PABLO ALÍ!"
-        
-        # Laberinto
-        self.mapa = []
-        self.px = self.py = 0
+        # Cuentos y Juego
+        self.lista_cuentos = []; self.sel_cuento_idx = 0
+        self.lineas_cuento = []; self.scroll_y = 0
+        self.modo_lectura = "LISTA"; self.texto_pantalla = "¡HOLA PABLO ALÍ!"
+        self.mapa = []; self.px = self.py = 0
 
     def cargar_lista_tales(self):
-        if not os.path.exists(TALES_DIR):
-            os.makedirs(TALES_DIR)
+        if not os.path.exists(TALES_DIR): os.makedirs(TALES_DIR)
         archivos = [f for f in os.listdir(TALES_DIR) if f.endswith(".txt")]
         return archivos if archivos else []
 
-    def cargar_contenido_cuento(self, nombre_archivo):
-        ruta = os.path.join(TALES_DIR, nombre_archivo)
+    def cargar_contenido_cuento(self, archivo):
+        ruta = os.path.join(TALES_DIR, archivo)
         try:
-            with open(ruta, 'r', encoding='utf-8') as f:
-                return f.readlines()
-        except:
-            return ["Error: No se pudo leer el cuento."]
+            with open(ruta, 'r', encoding='utf-8') as f: return f.readlines()
+        except: return ["Error al leer el cuento."]
 
     def cambiar_emo(self, emo, seg=2):
         self.estado_bot = emo
@@ -106,9 +92,9 @@ class BBotConsola:
             self.screen.fill(COLOR_FONDO)
 
             if self.modo == "CONFIG":
-                self.mostrar_texto("CONFIGURACIÓN DE MANDO", y=80, color=COLOR_NEON, size=30)
-                self.mostrar_texto(f"PABLO, PRESIONA: {self.pasos_config[self.indice_cfg]}", y=200, size=28)
-                self.mostrar_texto("(Usa la cruz o botones)", y=300, size=18, color=(150,150,150))
+                self.mostrar_texto("CONFIGURACIÓN UNIVERSAL", y=60, color=COLOR_NEON, size=30)
+                self.mostrar_texto(f"PABLO, PRESIONA: {self.pasos_config[self.indice_cfg]}", y=180, size=28)
+                self.mostrar_texto("Mueve la cruz o la palanca", y=280, size=18, color=(150,150,150))
 
             elif self.modo == "MENU":
                 self.dibujar_bot(t)
@@ -122,49 +108,42 @@ class BBotConsola:
             elif self.modo == "CUENTOS":
                 if self.modo_lectura == "LISTA":
                     self.mostrar_texto("BIBLIOTECA", y=40, color=COLOR_NEON, size=30)
-                    if not self.lista_cuentos:
-                        self.mostrar_texto("No hay cuentos en /.tales", y=200, color=(200,50,50))
+                    if not self.lista_cuentos: self.mostrar_texto("No hay archivos en /.tales", y=200, color=(200,50,50))
                     else:
                         for i, cuento in enumerate(self.lista_cuentos):
                             col = (255, 255, 0) if self.sel_cuento_idx == i else (150, 150, 150)
                             self.mostrar_texto(cuento.replace(".txt","").upper(), y=120+i*40, color=col, size=24)
-                
                 elif self.modo_lectura == "LEYENDO":
                     self.dibujar_bot(t, x=140, y_base=200, escala=0.9)
                     rect_txt = pygame.Rect(280, 40, 480, 320)
                     pygame.draw.rect(self.screen, (30, 30, 60), rect_txt, border_radius=15)
                     pygame.draw.rect(self.screen, COLOR_NEON, rect_txt, 2, border_radius=15)
-                    
-                    f_cuento = pygame.font.SysFont("Arial", 22)
+                    f_c = pygame.font.SysFont("Arial", 22)
                     for i, linea in enumerate(self.lineas_cuento):
                         y_p = 60 + (i * 30) - (self.scroll_y * 30)
-                        if 50 < y_p < 330:
-                            self.screen.blit(f_cuento.render(linea.strip(), True, COLOR_TEXTO), (300, y_p))
+                        if 50 < y_p < 330: self.screen.blit(f_c.render(linea.strip(), True, COLOR_TEXTO), (300, y_p))
 
             elif self.modo == "MASCOTA":
-                self.dibujar_bot(t)
-                self.mostrar_texto(f"HAMBRE: {self.hambre}% | ENERGÍA: {self.energia}%", y=60, color=COLOR_NEON)
-                if not self.menu_activo:
-                    self.mostrar_texto("B1: COMIDA | ARRIBA: ENERGÍA", y=280)
+                self.dibujar_bot(t); self.mostrar_texto(f"HAMBRE: {self.hambre}% | ENERGÍA: {self.energia}%", y=60, color=COLOR_NEON)
+                if not self.menu_activo: self.mostrar_texto("B1: COMIDA | ARRIBA: ENERGÍA", y=280)
                 else:
-                    items = ["PIZZA", "BURGER", "AGUA"] if self.menu_activo == "COMIDA" else ["DORMIR", "VITAMINA", "JUGAR"]
-                    for i, it in enumerate(items):
+                    it = ["PIZZA", "BURGER", "AGUA"] if self.menu_activo == "COMIDA" else ["DORMIR", "VITAMINA", "JUGAR"]
+                    for i, item in enumerate(it):
                         col = (255,255,255) if self.sel_sub == i else (100,100,100)
-                        self.mostrar_texto(f"> {it}" if self.sel_sub==i else it, y=240+i*30, color=col)
+                        self.mostrar_texto(f"> {item}" if self.sel_sub==i else item, y=240+i*30, color=col)
 
             elif self.modo == "JUGAR":
                 for r in range(8):
                     for c in range(8):
-                        color_b = (40,40,60) if self.mapa[r][c] == 1 else (200,200,200)
-                        if r==7 and c==7: color_b=(255,50,50)
-                        pygame.draw.rect(self.screen, color_b, (240+c*40, 40+r*40, 38, 38), border_radius=5)
+                        cb = (40,40,60) if self.mapa[r][c] == 1 else (200,200,200)
+                        if r==7 and c==7: cb=(255,50,50)
+                        pygame.draw.rect(self.screen, cb, (240+c*40, 40+r*40, 38, 38), border_radius=5)
                 pygame.draw.circle(self.screen, COLOR_NEON, (240+self.py*40+20, 40+self.px*40+20), 15)
 
             elif self.modo == "CHISTES":
-                self.dibujar_bot(t)
-                self.mostrar_texto(self.texto_pantalla, y=260, size=20)
+                self.dibujar_bot(t); self.mostrar_texto(self.texto_pantalla, y=260, size=20)
 
-            # --- GESTIÓN DE EVENTOS ---
+            # --- GESTIÓN DE EVENTOS UNIVERSAL ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: self.running = False
                 entrada = None
@@ -172,18 +151,20 @@ class BBotConsola:
                 if event.type == pygame.JOYBUTTONDOWN: 
                     entrada = {"tipo": "btn", "val": event.button}
                 elif event.type == pygame.JOYHATMOTION:
-                    # Filtro para el D-Pad (Cruz)
-                    if event.value != (0, 0):
-                        entrada = {"tipo": "hat", "val": list(event.value)}
+                    if event.value != (0, 0): entrada = {"tipo": "hat", "val": list(event.value)}
+                elif event.type == pygame.JOYAXISMOTION:
+                    if abs(event.value) > 0.6: # Umbral de sensibilidad
+                        entrada = {"tipo": "axis", "val": [event.axis, 1 if event.value > 0 else -1]}
 
                 if entrada:
                     if self.modo == "CONFIG":
                         self.controles[self.pasos_config[self.indice_cfg]] = entrada
+                        print(f"DEBUG: {self.pasos_config[self.indice_cfg]} -> {entrada}")
                         self.indice_cfg += 1
                         if self.indice_cfg >= len(self.pasos_config):
                             with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
                             self.modo = "MENU"
-                        pygame.time.wait(400) # Tiempo para soltar el botón
+                        pygame.time.wait(500)
                     
                     elif entrada == self.controles.get("BOTON 4"):
                         if self.modo == "CUENTOS" and self.modo_lectura == "LEYENDO": self.modo_lectura = "LISTA"
