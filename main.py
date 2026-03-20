@@ -12,7 +12,7 @@ COLOR_TEXTO_DARK = (40, 40, 60)
 CONFIG_FILE = "config_pablo.json"
 
 # ==========================================
-# CLASES DE JUEGOS (ARCADE INDEPENDIENTE)
+# CLASES DE JUEGOS (ARCADE)
 # ==========================================
 
 class JuegoNaves:
@@ -33,7 +33,7 @@ class JuegoNaves:
             for b in self.balas[:]:
                 if abs(e[0] - b[0]) < 25 and abs(e[1] - b[1]) < 25:
                     if e in self.enemigos: self.enemigos.remove(e)
-                    self.balas.remove(b)
+                    if b in self.balas: self.balas.remove(b)
             if e[1] > 400: return True
         return False
     def dibujar(self, sc):
@@ -72,7 +72,7 @@ class JuegoPacman:
         for r in range(8):
             for c in range(8):
                 if self.mapa[r][c] == 0: self.pts.append([r, c])
-        self.fantasmas = [{'x':7, 'y':7, 'c':(255,50,50)}]
+        self.fantasmas = [{'x':7.0, 'y':7.0, 'c':(255,50,50)}]
     def actualizar(self, ent, ctrl):
         nx, ny = self.px, self.py
         if ent == ctrl.get("IZQUIERDA"): ny -= 1
@@ -97,7 +97,7 @@ class JuegoPacman:
         for p in self.pts: pygame.draw.circle(sc, (255, 255, 255), (240+p[1]*40+20, 40+p[0]*40+20), 4)
         pygame.draw.circle(sc, (255, 255, 0), (240+self.py*40+20, 40+self.px*40+20), 16)
         f = self.fantasmas[0]
-        pygame.draw.circle(sc, f['c'], (240+f['y']*40+20, 40+f['x']*40+20), 16)
+        pygame.draw.circle(sc, f['c'], (240+int(f['y'])*40+20, 40+int(f['x'])*40+20), 16)
 
 # ==========================================
 # CONSOLA PRINCIPAL
@@ -105,20 +105,30 @@ class JuegoPacman:
 
 class BBotConsola:
     def __init__(self):
-        pygame.init()
-        pygame.joystick.init()
+        pygame.init(); pygame.joystick.init()
         
-        # --- BUSCADOR DE MANDOS ---
+        # Detector dinámico de mandos
         self.joy = None
         if pygame.joystick.get_count() > 0:
             self.joy = pygame.joystick.Joystick(0)
             self.joy.init()
-            print(f"Control detectado: {self.joy.get_name()}")
-        else:
-            print("No se detectó ningún control. Revisa el Bluetooth.")
+            print(f"Conectado a: {self.joy.get_name()}")
 
+        # Modo Maximizado para Raspberry
         self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
-        # ... resto del código ...
+        pygame.display.set_caption("B-Botgotchi - Pablo Alí")
+        self.clock = pygame.time.Clock(); self.running = True
+        
+        self.controles = {}
+        self.pasos_config = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
+        self.indice_cfg = 0
+        self.modo = "MENU" if os.path.exists(CONFIG_FILE) else "CONFIG"
+        if self.modo == "MENU":
+            with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
+        
+        self.opciones = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
+        self.seleccion = 0; self.sel_juego = 0; self.sub_modo = "MENU_JUEGOS"
+        self.juego_actual = None; self.texto_chiste = ""
 
     def run(self):
         while self.running:
@@ -131,34 +141,36 @@ class BBotConsola:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.running = False
                 entrada = self.obtener_entrada(event)
 
-            # --- CONFIGURACIÓN CON ANTIRREBOTE ---
+            # --- CONFIGURACIÓN CON ESPERA ---
             if self.modo == "CONFIG":
-                self.mostrar_texto("CONFIGURACIÓN DE MANDO", y=80, color=COLOR_TEXTO_DARK, size=30)
+                self.mostrar_texto("NUEVO MANDO DETECTADO", y=60, color=COLOR_TEXTO_DARK, size=30)
                 self.mostrar_texto(f"PABLO, PULSA Y SUELTA:", y=180, color=(100,100,100), size=20)
-                self.mostrar_texto(self.pasos_config[self.indice_cfg], y=230, color=(255, 50, 50), size=40)
+                self.mostrar_texto(self.pasos_config[self.indice_cfg], y=240, color=(255, 50, 50), size=45)
                 
                 if entrada:
                     self.controles[self.pasos_config[self.indice_cfg]] = entrada
                     self.indice_cfg += 1
-                    # Esperar a que suelte el botón
+                    
+                    # Ciclo de espera para soltar botón
                     esperando = True
                     while esperando:
                         for ev in pygame.event.get():
-                            if ev.type in [pygame.JOYBUTTONUP, pygame.JOYHATMOTION, pygame.JOYAXISMOTION]:
-                                if ev.type == pygame.JOYAXISMOTION and abs(ev.value) < 0.1: esperando = False
-                                elif ev.type != pygame.JOYAXISMOTION: esperando = False
+                            if ev.type == pygame.JOYBUTTONUP or (ev.type == pygame.JOYHATMOTION and ev.value == (0,0)):
+                                esperando = False
+                            if ev.type == pygame.JOYAXISMOTION and abs(ev.value) < 0.2:
+                                esperando = False
                         pygame.display.flip()
-                        self.clock.tick(20)
+                        self.clock.tick(30)
                     
                     if self.indice_cfg >= len(self.pasos_config):
                         with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
                         self.modo = "MENU"
 
-            # --- NAVEGACIÓN MENÚ ---
+            # --- MENÚ PRINCIPAL ---
             elif self.modo == "MENU":
                 self.dibujar_bot(t)
                 for i, opt in enumerate(self.opciones):
-                    c = (255, 255, 255) if self.seleccion == i else (130, 180, 200)
+                    c = (255, 255, 255) if self.seleccion == i else (140, 190, 210)
                     pygame.draw.rect(self.screen, c, (40+i*190, 310, 170, 50), border_radius=15)
                     self.mostrar_texto(opt, 40+i*190+85, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
                 
@@ -166,15 +178,16 @@ class BBotConsola:
                 elif entrada == self.controles.get("IZQUIERDA"): self.seleccion = (self.seleccion-1)%4
                 elif entrada == self.controles.get("A"): self.modo = self.opciones[self.seleccion]
 
-            # --- ARCADE ---
+            # --- SISTEMA DE JUEGOS ---
             elif self.modo == "JUGAR":
-                if entrada == self.controles.get("L"): self.sub_modo = "MENU_JUEGOS"; self.juego_actual = None
+                if entrada == self.controles.get("L"): # Botón de escape
+                    self.sub_modo = "MENU_JUEGOS"; self.juego_actual = None; self.modo = "MENU"
                 
                 if self.sub_modo == "MENU_JUEGOS":
                     self.mostrar_texto("ARCADE CENTER", y=40, color=COLOR_TEXTO_DARK, size=35)
                     juegos = ["NAVES", "CARRERAS", "PAC-MAN", "LABERINTO"]
                     for i, jg in enumerate(juegos):
-                        col = (255, 100, 0) if self.sel_juego == i else (80, 80, 100)
+                        col = (255, 100, 0) if self.sel_juego == i else (100, 100, 120)
                         self.mostrar_texto(jg, y=120+i*55, color=col, size=28)
                     if entrada == self.controles.get("ABAJO"): self.sel_juego = (self.sel_juego+1)%4
                     elif entrada == self.controles.get("ARRIBA"): self.sel_juego = (self.sel_juego-1)%4
@@ -187,7 +200,8 @@ class BBotConsola:
                              self.juego_actual = JuegoLaberintoOriginal()
                         self.sub_modo = "JUGANDO"
                 else:
-                    if self.juego_actual.actualizar(entrada, self.controles): self.sub_modo = "MENU_JUEGOS"
+                    if self.juego_actual.actualizar(entrada, self.controles): 
+                        self.sub_modo = "MENU_JUEGOS"
                     self.juego_actual.dibujar(self.screen)
 
             # --- CHISTES ---
@@ -216,7 +230,7 @@ class BBotConsola:
     def dibujar_bot(self, t):
         f = math.sin(t * 0.005) * 12
         pygame.draw.rect(self.screen, (255,255,255), (350, 100+f, 100, 110), border_radius=25)
-        # o _ o OJOS NEGROS
+        # Rostro o _ o
         pygame.draw.circle(self.screen, (0,0,0), (380, 135+f), 8)
         pygame.draw.circle(self.screen, (0,0,0), (420, 135+f), 8)
         pygame.draw.rect(self.screen, (0,0,0), (385, 155+f, 30, 4), border_radius=2)
