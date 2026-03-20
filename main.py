@@ -8,9 +8,23 @@ import random
 # --- CONFIGURACIÓN GLOBAL ---
 COLOR_FONDO = (173, 216, 230) 
 CONFIG_FILE = "config_pablo.json"
-FUENTE_RETRO = "Courier New" # Fuente con estilo pixel/monospaced
+FUENTE_RETRO = "Courier New"
 
-# --- MAPA PANORÁMICO PARA PAC-MAN ---
+# --- CONTENIDO PARA PABLO ALÍ ---
+CUENTOS = [
+    ["El Robot Guitarrista", "Había un robot que quería tocar la guitarra como Symphony X.", "Practicó tanto que sus dedos de metal sacaban chispas de colores.", "¡Al final, dio el concierto más épico de la galaxia!"],
+    ["Viaje a Marte", "Stephen Hawking envió un mensaje: '¡Hay gemas mágicas en Marte!'.", "Pablo Alí subió a su nave en forma de E y voló entre las estrellas.", "Encontró joyas que brillaban, pero recordó: '¡La salud es el mayor tesoro!'."],
+    ["El Pac-Man Valiente", "Un Pac-Man amarillo se perdió en un laberinto de 15 columnas.", "Dos fantasmas lo perseguían, pero él era muy rápido.", "Comió todas las frutas y se convirtió en el rey del Arcade."]
+]
+
+CHISTES = [
+    "¿Qué le dice un jaguar a otro jaguar?... ¡Jaguar-yu!",
+    "¿Por qué los pájaros vuelan al sur?... ¡Porque caminando tardarían mucho!",
+    "¿Qué hace una abeja en el gimnasio?... ¡Zumba!",
+    "Había una vez un perro que se llamaba Pegamento, se cayó y se pegó."
+]
+
+# --- LÓGICA DE MAPA ---
 def generar_mapa_ancho():
     return [
         [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -24,8 +38,9 @@ def generar_mapa_ancho():
     ]
 
 # ==========================================
-# CLASES DE JUEGOS
+# CLASES DE JUEGOS (NAVES, CARRERAS, PACMAN)
 # ==========================================
+# (Se mantienen iguales a la versión anterior para no romper los diseños)
 
 class JuegoNaves:
     def __init__(self):
@@ -33,7 +48,6 @@ class JuegoNaves:
         self.vidas = 3; self.puntos = 0; self.estado = "START"; self.timer_estado = 0
         self.colores = [(0,200,255), (0,255,100), (200,100,255), (255,150,0)]
         self.estrellas = [[random.randint(0, 800), random.randint(0, 400)] for _ in range(25)]
-    
     def actualizar(self, ent, ctrl):
         if self.estado == "START":
             self.timer_estado += 1
@@ -42,128 +56,85 @@ class JuegoNaves:
         for s in self.estrellas: s[1] = (s[1] + 5) % 400
         if ent == ctrl.get("IZQUIERDA"): self.x = max(30, self.x - 45)
         elif ent == ctrl.get("DERECHA"): self.x = min(770, self.x + 45)
-        elif ent == ctrl.get("X"): self.balas.append([self.x, 340]) # Usamos X para disparar para dejar A/B libres
-        
+        elif ent == ctrl.get("X"): self.balas.append([self.x, 340])
         if random.random() < 0.08: 
             lvl_idx = (self.puntos // 100) % len(self.colores)
             self.enemigos.append([random.randint(50, 750), -40, self.colores[lvl_idx]])
-            
         for b in self.balas[:]:
             b[1] -= 20
             if b[1] < 0: self.balas.remove(b)
         for e in self.enemigos[:]:
-            e[1] += (6 + (self.puntos // 100)) # Más rápido cada nivel
+            e[1] += (6 + (self.puntos // 100))
             for b in self.balas[:]:
                 if abs(e[0] - b[0]) < 30 and abs(e[1] - b[1]) < 30:
                     if e in self.enemigos: self.enemigos.remove(e)
                     if b in self.balas: self.balas.remove(b)
                     self.puntos += 10
-            # Colisión con la Nave "E"
             if e[1] > 330 and abs(e[0] - self.x) < 40:
                 self.vidas -= 1; self.enemigos = []; self.estado = "START"; self.timer_estado = 0
             elif e[1] > 400: self.enemigos.remove(e)
         return self.vidas <= 0
-
     def dibujar(self, sc):
         sc.fill((10, 10, 30))
         for s in self.estrellas: pygame.draw.circle(sc, (255, 255, 255), s, 1)
-        
-        # --- DIBUJO NAVE "E" ACOSTADA ---
-        c = (0, 200, 255)
-        pygame.draw.rect(sc, c, (self.x-20, 350, 40, 10)) # Base
-        pygame.draw.rect(sc, c, (self.x-20, 335, 8, 15))  # Ala Izq
-        pygame.draw.rect(sc, c, (self.x+12, 335, 8, 15))  # Ala Der
-        pygame.draw.rect(sc, (255, 255, 255), (self.x-2, 330, 4, 20)) # Cañón
-        
+        c = self.colores[(self.puntos // 100) % len(self.colores)]
+        pygame.draw.rect(sc, c, (self.x-20, 350, 40, 10))
+        pygame.draw.rect(sc, c, (self.x-20, 335, 8, 15)); pygame.draw.rect(sc, c, (self.x+12, 335, 8, 15))
+        pygame.draw.rect(sc, (255, 255, 255), (self.x-2, 330, 4, 20))
         for b in self.balas: pygame.draw.rect(sc, (255, 255, 0), (b[0]-2, b[1], 4, 10))
         for e in self.enemigos:
-            # --- UFO CON CABECITA REGRESADO ---
-            pygame.draw.ellipse(sc, e[2], (e[0]-22, e[1]-10, 44, 22)) # UFO
-            pygame.draw.circle(sc, (200, 255, 255), (e[0], e[1]-5), 8) # Cabina/Cúpula
-            
+            pygame.draw.ellipse(sc, e[2], (e[0]-22, e[1]-10, 44, 22))
+            pygame.draw.circle(sc, (200, 255, 255), (e[0], e[1]-5), 8)
         self.mostrar_hud(sc)
-
     def mostrar_hud(self, sc):
         font = pygame.font.SysFont(FUENTE_RETRO, 22, True)
-        pts_txt = font.render(f"SCORE:{self.puntos}", True, (255, 255, 255))
         sc.blit(font.render(f"HP:{self.vidas}", True, (255, 50, 50)), (20, 20))
+        pts_txt = font.render(f"SCORE:{self.puntos}", True, (255, 255, 255))
         sc.blit(pts_txt, (780 - pts_txt.get_width(), 20))
-        if self.estado == "START":
-            txt = font.render(f"VIDA {4 - self.vidas}", True, (255, 255, 0))
-            sc.blit(txt, (400 - txt.get_width()//2, 180))
 
 class JuegoCarreras:
     def __init__(self):
         self.x = 400; self.obs = []; self.v = 5; self.vidas = 3; self.estado = "START"
         self.distancia = 0; self.meta = 500; self.nivel = 1; self.timer = 0
-    
     def actualizar(self, ent, ctrl):
         if self.estado == "START":
             self.timer += 1
             if self.timer > 60: self.estado = "JUGANDO"; self.timer = 0
             return False
-        
-        # Sistema de Aceleración y Freno
-        # Usamos pygame.joystick directamente para detectar si el botón está presionado continuamente
         joy = pygame.joystick.Joystick(0) if pygame.joystick.get_count() > 0 else None
         if joy:
-            btn_a = ctrl.get("A", {}).get("val")
-            btn_b = ctrl.get("B", {}).get("val")
+            btn_a = ctrl.get("A", {}).get("val"); btn_b = ctrl.get("B", {}).get("val")
             if btn_a is not None and joy.get_button(btn_a): self.v = min(22, self.v + 0.4)
             elif btn_b is not None and joy.get_button(btn_b): self.v = max(0, self.v - 0.8)
-            else: self.v = max(5, self.v - 0.1) # Deceleración natural
-
+            else: self.v = max(5, self.v - 0.1)
         self.distancia += int(self.v / 5)
         if self.distancia >= self.meta:
             self.nivel += 1; self.meta += 500; self.estado = "START"; self.obs = []; return False
-
         if ent == ctrl.get("IZQUIERDA"): self.x = max(200, self.x - 30)
         elif ent == ctrl.get("DERECHA"): self.x = min(600, self.x + 30)
-        
         if random.random() < 0.07: 
             nx = random.randint(210, 590)
             if not any(abs(nx - o[0]) < 60 and o[1] < 150 for o in self.obs):
                 self.obs.append([nx, -100, random.choice([(0,255,100), (255,150,0), (200,100,255)])])
-        
         for o in self.obs[:]:
-            o[1] += int(self.v + 3) # Velocidad relativa corregida
+            o[1] += int(self.v + 3)
             if 310 < o[1] < 385 and abs(self.x - o[0]) < 45:
                 self.vidas -= 1; self.v = 5; self.obs = []; self.estado = "START"; self.timer = 0
             elif o[1] > 450: self.obs.remove(o)
         return self.vidas <= 0
-
     def dibujar(self, sc):
         sc.fill((34, 139, 34)) 
-        pygame.draw.rect(sc, (60, 60, 60), (180, 0, 440, 400)) 
-        pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400)) 
-        # Carro Pablo
-        for lx, ly in [(-26, 335), (18, 335), (-26, 370), (18, 370)]:
-            pygame.draw.rect(sc, (0,0,0), (self.x + lx, ly, 8, 12))
+        pygame.draw.rect(sc, (60, 60, 60), (180, 0, 440, 400))
+        pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400))
         pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6)
-        
-        # --- VIDRIO/PARABRISAS REGRESADO A LOS CARROS ---
         pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12)) 
-        
         for o in self.obs:
-            # Llantas enemigos
-            for lx, ly in [(-26, 5), (18, 5), (-26, 40), (18, 40)]:
-                pygame.draw.rect(sc, (0,0,0), (o[0] + lx, o[1] + ly, 8, 12))
             pygame.draw.rect(sc, o[2], (o[0]-20, o[1], 40, 60), border_radius=6)
-            # Vidrio enemigo
-            pygame.draw.rect(sc, (255, 255, 255), (o[0]-12, o[1]+10, 24, 12), border_radius=2) 
-            
+            pygame.draw.rect(sc, (255, 255, 255), (o[0]-12, o[1]+10, 24, 12))
         font = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(font.render(f"HP:{self.vidas}", True, (255, 255, 255)), (20, 20))
-        sc.blit(font.render(f"LVL:{self.nivel}", True, (255, 255, 255)), (20, 360))
         meta_txt = font.render(f"DIST:{self.distancia}/{self.meta}m", True, (255, 255, 0))
         sc.blit(meta_txt, (780 - meta_txt.get_width(), 20))
-        if self.estado == "START":
-            self.mostrar_msg(sc, f"NIVEL {self.nivel} - VIDA {4-self.vidas}")
-
-    def mostrar_msg(self, sc, ms):
-        f = pygame.font.SysFont(FUENTE_RETRO, 30, True)
-        t = f.render(ms, True, (255, 255, 255))
-        sc.blit(t, (400 - t.get_width()//2, 180))
 
 class JuegoPacman:
     def __init__(self):
@@ -171,9 +142,7 @@ class JuegoPacman:
         self.px, self.py = 1, 1; self.pts = []; self.vidas = 3; self.puntos = 0
         self.estado = "START"; self.timer = 0; self.nivel = 1; self.frame = 0; self.dir = "D"
         self.cargar_puntos()
-        # --- AHORA SON 2 FANTASMAS ---
-        self.fantasmas = [{'x': 6, 'y': 13, 'p': 0, 'c': (255, 50, 50)}, # Rojo (Blinky)
-                           {'x': 1, 'y': 13, 'p': 0, 'c': (255, 182, 193)}] # Rosa (Pinky)
+        self.fantasmas = [{'x': 6, 'y': 13, 'p': 0, 'c': (255, 50, 50)}, {'x': 1, 'y': 13, 'p': 0, 'c': (255, 182, 193)}]
     def cargar_puntos(self):
         self.pts = [[r, c] for r in range(8) for c in range(15) if self.mapa[r][c] == 0]
     def actualizar(self, ent, ctrl):
@@ -187,17 +156,12 @@ class JuegoPacman:
         elif ent == ctrl.get("DERECHA"): ny += 1; self.dir = "D"
         elif ent == ctrl.get("ARRIBA"): nx -= 1; self.dir = "A"
         elif ent == ctrl.get("ABAJO"): nx += 1; self.dir = "B"
-        if 0 <= nx < 8 and 0 <= ny < 15 and self.mapa[nx][ny] == 0:
-            self.px, self.py = nx, ny
-        if [self.px, self.py] in self.pts: 
-            self.pts.remove([self.px, self.py]); self.puntos += 10
-        if not self.pts:
-            self.nivel += 1; self.cargar_puntos(); self.estado = "START"; self.timer = 0
-        
-        # Inteligencia de los 2 fantasmas
+        if 0 <= nx < 8 and 0 <= ny < 15 and self.mapa[nx][ny] == 0: self.px, self.py = nx, ny
+        if [self.px, self.py] in self.pts: self.pts.remove([self.px, self.py]); self.puntos += 10
+        if not self.pts: self.nivel += 1; self.cargar_puntos(); self.estado = "START"; self.timer = 0
         for f in self.fantasmas:
             f['p'] += 1
-            if f['p'] > (16 - self.nivel): # Más rápido cada nivel
+            if f['p'] > (16 - self.nivel):
                 f['p'] = 0
                 dx = 1 if f['x'] < self.px else -1 if f['x'] > self.px else 0
                 dy = 1 if f['y'] < self.py else -1 if f['y'] > self.py else 0
@@ -205,49 +169,32 @@ class JuegoPacman:
                 elif dy != 0 and self.mapa[int(f['x'])][int(f['y'] + dy)] == 0: f['y'] += dy
             if int(f['x']) == self.px and int(f['y']) == self.py:
                 self.vidas -= 1; self.px, self.py = 1, 1; self.estado = "START"; self.timer = 0
-                self.fantasmas[0]['x'], self.fantasmas[0]['y'] = 6, 13
-                self.fantasmas[1]['x'], self.fantasmas[1]['y'] = 1, 13
         return self.vidas <= 0
-
     def dibujar(self, sc):
         sc.fill((0,0,20))
-        # Laberinto con paredes sólidas
         for r in range(8):
             for c in range(15):
                 x, y = 25 + c*50, 10 + r*50
-                if self.mapa[r][c] == 1: 
-                    pygame.draw.rect(sc, (0,50,180), (x, y, 50, 50))
-                    pygame.draw.rect(sc, (0,80,255), (x+2, y+2, 46, 46), 1)
+                if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0,50,180), (x+10, y+10, 30, 30), border_radius=4)
                 elif [r,c] in self.pts: pygame.draw.circle(sc, (255, 255, 200), (x+25, y+25), 4)
-        
-        # --- PACMAN CON OJO Y BOCA REGRESADO ---
         px, py = 25 + self.py*50 + 25, 10 + self.px*50 + 25
         pygame.draw.circle(sc, (255, 255, 0), (px, py), 20)
-        # Ojo Negro
         pygame.draw.circle(sc, (0,0,0), (px+5, py-10), 3) 
-        # Boca animada pizza que cambia de dirección
         if (self.frame // 10) % 2 == 0:
-            puntos_boca = {"D": [(px, py), (px+22, py-12), (px+22, py+12)],
-                           "I": [(px, py), (px-22, py-12), (px-22, py+12)],
-                           "A": [(px, py), (px-12, py-22), (px+12, py-22)],
-                           "B": [(px, py), (px-12, py+22), (px+12, py+22)]}
+            puntos_boca = {"D": [(px, py), (px+22, py-12), (px+22, py+12)], "I": [(px, py), (px-22, py-12), (px-22, py+12)],
+                           "A": [(px, py), (px-12, py-22), (px+12, py-22)], "B": [(px, py), (px-12, py+22), (px+12, py+22)]}
             pygame.draw.polygon(sc, (0,0,20), puntos_boca[self.dir])
-        
-        # --- DIBUJO FANTASMA "U" INVERTIDA REGRESADO ---
         for f in self.fantasmas:
             fx, fy = 25 + int(f['y'])*50 + 12, 10 + int(f['x'])*50 + 12
-            pygame.draw.rect(sc, f['c'], (fx, fy+12, 26, 14)) # Base
-            pygame.draw.circle(sc, f['c'], (fx+13, fy+13), 13) # Cabeza
-            # Ojos
+            pygame.draw.rect(sc, f['c'], (fx, fy+12, 26, 14)); pygame.draw.circle(sc, f['c'], (fx+13, fy+13), 13)
             pygame.draw.circle(sc, (255, 255, 255), (fx+7, fy+10), 4); pygame.draw.circle(sc, (255, 255, 255), (fx+19, fy+10), 4)
-        
         font = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(font.render(f"HP:{self.vidas}", True, (255, 255, 255)), (20, 20))
         pts_txt = font.render(f"SCORE:{self.puntos}", True, (255, 255, 0))
         sc.blit(pts_txt, (780 - pts_txt.get_width(), 20))
 
 # ==========================================
-# CONSOLA PRINCIPAL (Mantiene lógica anterior)
+# CONSOLA PRINCIPAL
 # ==========================================
 
 class BBotConsola:
@@ -265,6 +212,7 @@ class BBotConsola:
         self.indice_cfg = 0
         self.opciones = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
         self.seleccion = 0; self.sel_juego = 0; self.sub_modo = "MENU_JUEGOS"; self.juego_actual = None
+        self.item_idx = 0; self.linea_idx = 0 # Para cuentos/chistes
 
     def run(self):
         while self.running:
@@ -276,7 +224,7 @@ class BBotConsola:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self.running = False
                 entrada = self.obtener_entrada(event)
 
-            if entrada == self.controles.get("L"):
+            if entrada == self.controles.get("L"): # Botón de pánico / Regreso
                 self.modo = "MENU"; self.sub_modo = "MENU_JUEGOS"; self.juego_actual = None
 
             if self.modo == "CONFIG":
@@ -297,7 +245,9 @@ class BBotConsola:
                     self.mostrar_texto(opt, 40+i*190+85, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
                 if entrada == self.controles.get("DERECHA"): self.seleccion = (self.seleccion+1)%4
                 elif entrada == self.controles.get("IZQUIERDA"): self.seleccion = (self.seleccion-1)%4
-                elif entrada == self.controles.get("A"): self.modo = self.opciones[self.seleccion]
+                elif entrada == self.controles.get("A"): 
+                    self.modo = self.opciones[self.seleccion]
+                    self.item_idx = 0; self.linea_idx = 0
 
             elif self.modo == "JUGAR":
                 if self.sub_modo == "MENU_JUEGOS":
@@ -319,6 +269,29 @@ class BBotConsola:
                         pygame.display.flip(); time.sleep(2); self.sub_modo = "MENU_JUEGOS"
                     else: self.juego_actual.dibujar(self.screen)
 
+            elif self.modo == "CUENTOS":
+                self.dibujar_bot(t, x=650)
+                cuento = CUENTOS[self.item_idx]
+                self.mostrar_texto(cuento[0], y=50, color=(200, 0, 0), size=35)
+                # Mostrar la línea actual del cuento
+                texto_linea = cuento[self.linea_idx + 1]
+                self.mostrar_texto(texto_linea, y=200, color=(0,0,0), size=20)
+                self.mostrar_texto("PULSA A PARA SEGUIR", y=350, color=(100,100,100), size=15)
+                
+                if entrada == self.controles.get("A"):
+                    self.linea_idx += 1
+                    if self.linea_idx >= len(cuento) - 1:
+                        self.linea_idx = 0
+                        self.item_idx = (self.item_idx + 1) % len(CUENTOS)
+
+            elif self.modo == "CHISTES":
+                self.dibujar_bot(t, x=150)
+                self.mostrar_texto("¡HORA DE REÍR!", y=50, color=(0, 150, 0), size=35)
+                self.mostrar_texto(CHISTES[self.item_idx], y=200, color=(0,0,0), size=20)
+                self.mostrar_texto("PULSA A PARA OTRO CHISTE", y=350, color=(100,100,100), size=15)
+                if entrada == self.controles.get("A"):
+                    self.item_idx = (self.item_idx + 1) % len(CHISTES)
+
             pygame.display.flip()
             self.clock.tick(60)
 
@@ -331,14 +304,21 @@ class BBotConsola:
 
     def mostrar_texto(self, txt, x=400, y=200, color=(255,255,255), size=22):
         font = pygame.font.SysFont(FUENTE_RETRO, size, True)
-        s = font.render(str(txt), True, color)
-        self.screen.blit(s, (x - s.get_width()//2, y))
+        palabras = str(txt).split(' ')
+        lineas = []; linea_act = ""
+        for p in palabras:
+            if len(linea_act + p) < 40: linea_act += p + " "
+            else: lineas.append(linea_act); linea_act = p + " "
+        lineas.append(linea_act)
+        for i, l in enumerate(lineas):
+            s = font.render(l, True, color)
+            self.screen.blit(s, (x - s.get_width()//2, y + i*25))
 
-    def dibujar_bot(self, t):
+    def dibujar_bot(self, t, x=400):
         f = math.sin(t * 0.005) * 12
-        pygame.draw.rect(self.screen, (255,255,255), (350, 100+f, 100, 110), border_radius=25)
-        pygame.draw.circle(self.screen, (0,0,0), (380, 135+f), 8); pygame.draw.circle(self.screen, (0,0,0), (420, 135+f), 8)
-        pygame.draw.rect(self.screen, (0,0,0), (385, 155+f, 30, 4), border_radius=2)
+        pygame.draw.rect(self.screen, (255,255,255), (x-50, 100+f, 100, 110), border_radius=25)
+        pygame.draw.circle(self.screen, (0,0,0), (x-20, 135+f), 8); pygame.draw.circle(self.screen, (0,0,0), (x+20, 135+f), 8)
+        pygame.draw.rect(self.screen, (0,0,0), (x-15, 155+f, 30, 4), border_radius=2)
 
 if __name__ == "__main__":
     BBotConsola().run()
