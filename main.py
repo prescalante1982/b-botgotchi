@@ -105,20 +105,20 @@ class JuegoPacman:
 
 class BBotConsola:
     def __init__(self):
-        pygame.init(); pygame.joystick.init()
-        # Fullscreen para la Raspberry Pi
-        self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
-        self.clock = pygame.time.Clock(); self.running = True
-        self.controles = {}
-        self.pasos_config = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
-        self.indice_cfg = 0
-        self.modo = "MENU" if os.path.exists(CONFIG_FILE) else "CONFIG"
-        if self.modo == "MENU":
-            with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
+        pygame.init()
+        pygame.joystick.init()
         
-        self.opciones = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
-        self.seleccion = 0; self.sel_juego = 0; self.sub_modo = "MENU_JUEGOS"
-        self.juego_actual = None; self.texto_chiste = ""
+        # --- BUSCADOR DE MANDOS ---
+        self.joy = None
+        if pygame.joystick.get_count() > 0:
+            self.joy = pygame.joystick.Joystick(0)
+            self.joy.init()
+            print(f"Control detectado: {self.joy.get_name()}")
+        else:
+            print("No se detectó ningún control. Revisa el Bluetooth.")
+
+        self.screen = pygame.display.set_mode((800, 400), pygame.FULLSCREEN | pygame.SCALED)
+        # ... resto del código ...
 
     def run(self):
         while self.running:
