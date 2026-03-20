@@ -13,7 +13,7 @@ CONFIG_FILE = "config_pablo.json"
 FUENTE_RETRO = "Courier New"
 
 # ==========================================
-# LÓGICA DE JUEGOS (CON VIDAS Y PUNTOS)
+# LÓGICA DE JUEGOS
 # ==========================================
 
 class JuegoNaves:
@@ -43,17 +43,15 @@ class JuegoNaves:
         for s in self.estrellas: 
             s[0] = (s[0] - s[2]*2) % 800
             pygame.draw.circle(sc, (255,255,255), (int(s[0]), s[1]), 1)
-        # NAVE E PABLO ALÍ
         pygame.draw.rect(sc, (0,200,255), (self.x-20, 350, 40, 10))
         pygame.draw.rect(sc, (0,200,255), (self.x-20, 335, 8, 15))
         pygame.draw.rect(sc, (0,200,255), (self.x+12, 335, 8, 15))
         pygame.draw.rect(sc, (255,255,255), (self.x-2, 330, 4, 20))
         for e in self.enemigos:
-            pygame.draw.ellipse(sc, (200,100,255), (e[0]-22, e[1]-10, 44, 22)) # UFO
-            pygame.draw.circle(sc, (200,255,255), (e[0], e[1]-5), 8) # CÚPULA
+            pygame.draw.ellipse(sc, (200,100,255), (e[0]-22, e[1]-10, 44, 22))
+            pygame.draw.circle(sc, (200,255,255), (e[0], e[1]-5), 8)
         for b in self.balas: pygame.draw.rect(sc, (255,255,0), (b[0]-2, b[1], 4, 10))
         self.HUD(sc)
-
     def HUD(self, sc):
         f = pygame.font.SysFont(FUENTE_RETRO, 18, True)
         sc.blit(f.render(f"PUNTOS: {self.puntos}", True, (255,255,255)), (20, 20))
@@ -75,11 +73,11 @@ class JuegoCarreras:
         return self.vidas <= 0
     def dibujar(self, sc):
         sc.fill((34, 139, 34))
-        pygame.draw.rect(sc, (110, 110, 110), (180, 0, 440, 400)) # Pista
-        pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400)) # Línea
+        pygame.draw.rect(sc, (110, 110, 110), (180, 0, 440, 400))
+        pygame.draw.rect(sc, (255, 255, 255), (395, 0, 10, 400))
         if self.flash > 0: sc.fill((200, 0, 0), special_flags=pygame.BLEND_ADD)
-        pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6) # Carro
-        pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12)) # Vidrio
+        pygame.draw.rect(sc, (200, 0, 0), (self.x-20, 330, 40, 60), border_radius=6)
+        pygame.draw.rect(sc, (150, 200, 255), (self.x-12, 345, 24, 12))
         for o in self.obs: pygame.draw.rect(sc, (255,140,0), (o[0]-20, o[1], 40, 60), border_radius=6)
         f = pygame.font.SysFont(FUENTE_RETRO, 18, True)
         sc.blit(f.render(f"KM: {self.puntos//10}", True, (255,255,255)), (20, 20))
@@ -114,18 +112,26 @@ class JuegoPacman:
 class BBotConsola:
     def __init__(self):
         pygame.init(); pygame.joystick.init()
+        self.joy = None
         if pygame.joystick.get_count() > 0:
             self.joy = pygame.joystick.Joystick(0); self.joy.init()
-        self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.FULLSCREEN | pygame.SCALED)
+        
+        self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
+        pygame.display.set_caption("B-Bot Consola")
         pygame.mouse.set_visible(False)
         self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
         self.controles = {}
-        if not os.path.exists(CONFIG_FILE): self.modo = "CONFIG"
+        
+        # Pasos de configuración para 8BitDo y similares
+        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
+        self.idx_cfg = 0
+
+        if not os.path.exists(CONFIG_FILE): 
+            self.modo = "CONFIG"
         else:
             with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
         
-        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
-        self.idx_cfg = 0; self.seleccion = 0; self.sel_juego = 0; self.juego = None
+        self.seleccion = 0; self.sel_juego = 0; self.juego = None
         self.txt_cuento = "Había una vez un niño llamado Pablo Alí que tenía un robot llamado B-Bot. Juntos viajaban por las estrellas en una nave con forma de letra E y ganaban todas las carreras."
 
     def obtener_accion(self, ev):
@@ -134,7 +140,13 @@ class BBotConsola:
             if ev.type == pygame.JOYBUTTONDOWN and m.get("tipo") == "btn" and ev.button == m["val"]: return accion
             if ev.type == pygame.JOYHATMOTION and m.get("tipo") == "hat" and list(ev.value) == m["val"]: return accion
             if ev.type == pygame.JOYAXISMOTION and m.get("tipo") == "axis" and ev.axis == m["axis"]:
-                if (ev.value > 0.8 and m["val"] == 1) or (ev.value < -0.8 and m["val"] == -1): return accion
+                if (ev.value > 0.7 and m["val"] == 1) or (ev.value < -0.7 and m["val"] == -1): return accion
+        # Soporte teclado básico para debug
+        if ev.type == pygame.KEYDOWN:
+            if ev.key == pygame.K_LEFT: return "IZQUIERDA"
+            if ev.key == pygame.K_RIGHT: return "DERECHA"
+            if ev.key == pygame.K_SPACE or ev.key == pygame.K_RETURN: return "A"
+            if ev.key == pygame.K_ESCAPE: return "SELECT"
         return None
 
     def run(self):
@@ -142,21 +154,34 @@ class BBotConsola:
             self.screen.fill(CELESTE_CIELO)
             t = pygame.time.get_ticks()
             accion = None
+            
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
+                
+                # --- MODO CONFIGURACIÓN ---
                 if self.modo == "CONFIG":
                     m = None
-                    if ev.type == pygame.JOYBUTTONDOWN: m = {"tipo": "btn", "val": ev.button}
-                    elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0): m = {"tipo": "hat", "val": list(ev.value)}
+                    if ev.type == pygame.JOYBUTTONDOWN: 
+                        m = {"tipo": "btn", "val": ev.button}
+                    elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0): 
+                        m = {"tipo": "hat", "val": list(ev.value)}
+                    elif ev.type == pygame.JOYAXISMOTION and abs(ev.value) > 0.8:
+                        m = {"tipo": "axis", "axis": ev.axis, "val": 1 if ev.value > 0 else -1}
+
                     if m:
                         self.controles[self.pasos_cfg[self.idx_cfg]] = m
-                        self.idx_cfg += 1; pygame.time.delay(450)
+                        self.idx_cfg += 1
+                        pygame.time.delay(500)
+                        pygame.event.clear() # Evita rebotes
                         if self.idx_cfg >= len(self.pasos_cfg):
-                            with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f); self.modo = "MENU"
-                else: accion = self.obtener_accion(ev)
+                            with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
+                            self.modo = "MENU"
+                else: 
+                    accion = self.obtener_accion(ev)
 
             # --- LÓGICA DE NAVEGACIÓN ---
-            if accion == "L" or accion == "SELECT": self.modo = "MENU"; self.juego = None
+            if accion == "SELECT": 
+                self.modo = "MENU"; self.juego = None
 
             if self.modo == "MENU":
                 self.dibujar_bot(t)
@@ -165,6 +190,7 @@ class BBotConsola:
                     c = (255,255,255) if self.seleccion == i else (140, 190, 210)
                     pygame.draw.rect(self.screen, c, (40+i*185, 310, 165, 50), border_radius=15)
                     self.mostrar_t(opt, 40+i*185+82, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
+                
                 if accion == "DERECHA": self.seleccion = (self.seleccion+1)%4
                 elif accion == "IZQUIERDA": self.seleccion = (self.seleccion-1)%4
                 elif accion == "A": self.modo = "SUB_" + opts[self.seleccion]
@@ -202,8 +228,9 @@ class BBotConsola:
                 self.mostrar_t("¡HOLA PABLO ALÍ!", y=320, color=(0,0,0), size=35)
 
             elif self.modo == "CONFIG":
-                self.mostrar_t("CONFIGURAR MANDO", y=100, color=(0,0,0), size=30)
+                self.mostrar_t("CONFIGURAR MANDO 8BITDO", y=100, color=(0,0,0), size=30)
                 self.mostrar_t(f"PULSA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=45)
+                self.mostrar_t("MUEVE LA CRUCETA O PULSA EL BOTÓN", y=300, color=(50,50,50), size=18)
 
             pygame.display.flip(); self.clock.tick(60)
 
