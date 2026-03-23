@@ -122,7 +122,6 @@ class BBotConsola:
         self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
         self.controles = {}
         
-        # Pasos de configuración para 8BitDo y similares
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
         self.idx_cfg = 0
 
@@ -132,8 +131,8 @@ class BBotConsola:
             with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
         
         self.seleccion = 0; self.sel_juego = 0; self.juego = None
-        self.txt_cuento = "Había una vez un niño llamado Pablo Alí que tenía un robot llamado B-Bot. Juntos viajaban por las estrellas en una nave con forma de letra E y ganaban todas las carreras."
-# Configuración de Cuentos Dinámicos
+        
+        # --- Configuración de Cuentos Dinámicos ---
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.tales_dir = os.path.join(self.base_path, "tales")
         if not os.path.exists(self.tales_dir):
@@ -149,182 +148,4 @@ class BBotConsola:
         for accion, m in self.controles.items():
             if ev.type == pygame.JOYBUTTONDOWN and m.get("tipo") == "btn" and ev.button == m["val"]: return accion
             if ev.type == pygame.JOYHATMOTION and m.get("tipo") == "hat" and list(ev.value) == m["val"]: return accion
-            if ev.type == pygame.JOYAXISMOTION and m.get("tipo") == "axis" and ev.axis == m["axis"]:
-                if (ev.value > 0.7 and m["val"] == 1) or (ev.value < -0.7 and m["val"] == -1): return accion
-        # Soporte teclado básico para debug
-        if ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_LEFT: return "IZQUIERDA"
-            if ev.key == pygame.K_RIGHT: return "DERECHA"
-            if ev.key == pygame.K_SPACE or ev.key == pygame.K_RETURN: return "A"
-            if ev.key == pygame.K_ESCAPE: return "SELECT"
-        return None
-        
-def cargar_lista_tales(self):
-        """Busca archivos .txt en la carpeta tales."""
-        if os.path.exists(self.tales_dir):
-            archivos = [f for f in os.listdir(self.tales_dir) if f.endswith('.txt')]
-            self.lista_cuentos = sorted(archivos) if archivos else ["No hay cuentos.txt"]
-
-    def preparar_paginas(self, texto):
-        """Divide el texto en páginas que quepan en la pantalla."""
-        fuente = pygame.font.SysFont(FUENTE_RETRO, 22)
-        lineas_totales = self.wrap(texto, fuente, 700)
-        lineas_por_pagina = 8  # Ajuste para que se vea limpio
-        return [lineas_totales[i:i + lineas_por_pagina] for i in range(0, len(lineas_totales), lineas_por_pagina)]
-
-    def leer_cuento(self, nombre_archivo):
-        ruta = os.path.join(self.tales_dir, nombre_archivo)
-        try:
-            with open(ruta, 'r', encoding='utf-8') as f:
-                return f.read()
-        except:
-            return "Error al abrir el cuento. Revisa el formato UTF-8."
-    
-    def run(self):
-        while self.running:
-            self.screen.fill(CELESTE_CIELO)
-            t = pygame.time.get_ticks()
-            accion = None
-            
-            for ev in pygame.event.get():
-                if ev.type == pygame.QUIT: self.running = False
-                
-                # --- MODO CONFIGURACIÓN ---
-                if self.modo == "CONFIG":
-                    m = None
-                    if ev.type == pygame.JOYBUTTONDOWN: 
-                        m = {"tipo": "btn", "val": ev.button}
-                    elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0): 
-                        m = {"tipo": "hat", "val": list(ev.value)}
-                    elif ev.type == pygame.JOYAXISMOTION and abs(ev.value) > 0.8:
-                        m = {"tipo": "axis", "axis": ev.axis, "val": 1 if ev.value > 0 else -1}
-
-                    if m:
-                        self.controles[self.pasos_cfg[self.idx_cfg]] = m
-                        self.idx_cfg += 1
-                        pygame.time.delay(500)
-                        pygame.event.clear() # Evita rebotes
-                        if self.idx_cfg >= len(self.pasos_cfg):
-                            with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
-                            self.modo = "MENU"
-                else: 
-                    accion = self.obtener_accion(ev)
-
-            # --- LÓGICA DE NAVEGACIÓN ---
-            if accion == "SELECT": 
-                self.modo = "MENU"; self.juego = None
-
-            if self.modo == "MENU":
-                self.dibujar_bot(t)
-                opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
-                for i, opt in enumerate(opts):
-                    c = (255,255,255) if self.seleccion == i else (140, 190, 210)
-                    pygame.draw.rect(self.screen, c, (40+i*185, 310, 165, 50), border_radius=15)
-                    self.mostrar_t(opt, 40+i*185+82, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
-                
-                if accion == "DERECHA": self.seleccion = (self.seleccion+1)%4
-                elif accion == "IZQUIERDA": self.seleccion = (self.seleccion-1)%4
-                elif accion == "A": self.modo = "SUB_" + opts[self.seleccion]
-
-            elif self.modo == "SUB_JUGAR":
-                self.mostrar_t("¿QUÉ JUGAMOS HOY?", y=80, color=(0,0,0), size=30)
-                jgs = ["NAVES", "CARROS", "PACMAN"]
-                for i, j in enumerate(jgs):
-                    c = (255,255,255) if self.sel_juego == i else (140, 190, 210)
-                    pygame.draw.rect(self.screen, c, (100+i*210, 200, 180, 60), border_radius=12)
-                    self.mostrar_t(j, 100+i*210+90, 215, (0,0,0) if self.sel_juego==i else (255,255,255), size=20)
-                if accion == "DERECHA": self.sel_juego = (self.sel_juego+1)%3
-                elif accion == "IZQUIERDA": self.sel_juego = (self.sel_juego-1)%3
-                elif accion == "A":
-                    self.modo = "EN_JUEGO"
-                    if self.sel_juego == 0: self.juego = JuegoNaves()
-                    elif self.sel_juego == 1: self.juego = JuegoCarreras()
-                    else: self.juego = JuegoPacman()
-
-            elif self.modo == "EN_JUEGO":
-                if self.juego.actualizar(accion): self.modo = "SUB_JUGAR"
-                else: self.juego.dibujar(self.screen)
-
-# --- MENÚ DE SELECCIÓN DE CUENTOS ---
-            if self.modo == "SUB_CUENTOS":
-                self.cargar_lista_tales()
-                self.screen.fill(CELESTE_CIELO)
-                self.mostrar_t("BIBLIOTECA DE PABLO ALÍ", y=30, color=(0,0,0), size=30)
-                
-                # Listar cuentos (máximo 6 en pantalla para no amontonar)
-                for i, nombre in enumerate(self.lista_cuentos[:6]):
-                    c = (255,255,255) if self.idx_cuento == i else (50, 50, 50)
-                    bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
-                    rect = pygame.Rect(100, 90 + i*45, 600, 40)
-                    pygame.draw.rect(self.screen, bg, rect, border_radius=10)
-                    self.mostrar_t(nombre.replace(".txt", ""), 400, 98 + i*45, c, size=20)
-
-                if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(self.lista_cuentos)
-                elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(self.lista_cuentos)
-                elif accion == "A":
-                    contenido = self.leer_cuento(self.lista_cuentos[self.idx_cuento])
-                    self.paginas_cuento = self.preparar_paginas(contenido)
-                    self.pagina_actual = 0
-                    self.modo = "LEYENDO_CUENTO"
-
-            # --- MODO LECTURA POR PÁGINAS ---
-            elif self.modo == "LEYENDO_CUENTO":
-                self.screen.fill((255, 255, 245)) # Color papel
-                # Título del cuento arriba
-                titulo = self.lista_cuentos[self.idx_cuento].replace(".txt", "").upper()
-                self.mostrar_t(titulo, y=20, color=(100, 100, 100), size=16)
-
-                # Dibujar las líneas de la página actual
-                f_c = pygame.font.SysFont(FUENTE_RETRO, 22)
-                if self.paginas_cuento:
-                    for i, linea in enumerate(self.paginas_cuento[self.pagina_actual]):
-                        txt_surf = f_c.render(linea, True, (30, 30, 30))
-                        self.screen.blit(txt_surf, (50, 70 + i*35))
-
-                    # Indicador de página abajo
-                    info_pag = f"Página {self.pagina_actual + 1} de {len(self.paginas_cuento)}"
-                    self.mostrar_t(info_pag, y=360, color=(150, 150, 150), size=14)
-                
-                # Controles de lectura
-                if accion == "DERECHA" or accion == "A":
-                    if self.pagina_actual < len(self.paginas_cuento) - 1:
-                        self.pagina_actual += 1
-                elif accion == "IZQUIERDA":
-                    if self.pagina_actual > 0:
-                        self.pagina_actual -= 1
-                elif accion == "B" or accion == "SELECT":
-                    self.modo = "SUB_CUENTOS"
-
-            elif self.modo == "SUB_MASCOTA":
-                self.dibujar_bot(t, size_mult=1.6)
-                self.mostrar_t("¡HOLA PABLO ALÍ!", y=320, color=(0,0,0), size=35)
-
-            elif self.modo == "CONFIG":
-                self.mostrar_t("CONFIGURAR MANDO 8BITDO", y=100, color=(0,0,0), size=30)
-                self.mostrar_t(f"PULSA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=45)
-                self.mostrar_t("MUEVE LA CRUCETA O PULSA EL BOTÓN", y=300, color=(50,50,50), size=18)
-
-            pygame.display.flip(); self.clock.tick(60)
-
-    def mostrar_t(self, txt, x=400, y=200, color=(255,255,255), size=22):
-        f = pygame.font.SysFont(FUENTE_RETRO, size, True)
-        s = f.render(str(txt), True, color)
-        self.screen.blit(s, (x - s.get_width()//2, y))
-
-    def dibujar_bot(self, t, x=400, size_mult=1.0):
-        f = math.sin(t * 0.005) * (12 * size_mult)
-        w, h = 100 * size_mult, 110 * size_mult
-        pygame.draw.rect(self.screen, (255,255,255), (x-w/2, 100+f, w, h), border_radius=int(25*size_mult))
-        pygame.draw.circle(self.screen, (0,0,0), (x-20*size_mult, 135*size_mult+f), 8*size_mult)
-        pygame.draw.circle(self.screen, (0,0,0), (x+20*size_mult, 135*size_mult+f), 8*size_mult)
-        pygame.draw.rect(self.screen, (0,0,0), (x-15*size_mult, 155*size_mult+f, 30*size_mult, 4*size_mult))
-
-    def wrap(self, texto, fuente, ancho_max):
-        pals = texto.split(' '); lins = []; l_act = ""
-        for p in pals:
-            if fuente.size(l_act + p)[0] < ancho_max: l_act += p + " "
-            else: lins.append(l_act); l_act = p + " "
-        lins.append(l_act); return lins
-
-if __name__ == "__main__":
-    BBotConsola().run()
+            if ev.type == pygame.JOYAXISMOTION and m.get("tipo") == "axis" and ev.axis == m["axis
