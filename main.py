@@ -133,7 +133,17 @@ class BBotConsola:
         
         self.seleccion = 0; self.sel_juego = 0; self.juego = None
         self.txt_cuento = "Había una vez un niño llamado Pablo Alí que tenía un robot llamado B-Bot. Juntos viajaban por las estrellas en una nave con forma de letra E y ganaban todas las carreras."
-
+# Configuración de Cuentos Dinámicos
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        self.tales_dir = os.path.join(self.base_path, "tales")
+        if not os.path.exists(self.tales_dir):
+            os.makedirs(self.tales_dir)
+        
+        self.lista_cuentos = []
+        self.idx_cuento = 0
+        self.paginas_cuento = []
+        self.pagina_actual = 0
+    
     def obtener_accion(self, ev):
         if not self.controles: return None
         for accion, m in self.controles.items():
@@ -148,7 +158,28 @@ class BBotConsola:
             if ev.key == pygame.K_SPACE or ev.key == pygame.K_RETURN: return "A"
             if ev.key == pygame.K_ESCAPE: return "SELECT"
         return None
+        
+def cargar_lista_tales(self):
+        """Busca archivos .txt en la carpeta tales."""
+        if os.path.exists(self.tales_dir):
+            archivos = [f for f in os.listdir(self.tales_dir) if f.endswith('.txt')]
+            self.lista_cuentos = sorted(archivos) if archivos else ["No hay cuentos.txt"]
 
+    def preparar_paginas(self, texto):
+        """Divide el texto en páginas que quepan en la pantalla."""
+        fuente = pygame.font.SysFont(FUENTE_RETRO, 22)
+        lineas_totales = self.wrap(texto, fuente, 700)
+        lineas_por_pagina = 8  # Ajuste para que se vea limpio
+        return [lineas_totales[i:i + lineas_por_pagina] for i in range(0, len(lineas_totales), lineas_por_pagina)]
+
+    def leer_cuento(self, nombre_archivo):
+        ruta = os.path.join(self.tales_dir, nombre_archivo)
+        try:
+            with open(ruta, 'r', encoding='utf-8') as f:
+                return f.read()
+        except:
+            return "Error al abrir el cuento. Revisa el formato UTF-8."
+    
     def run(self):
         while self.running:
             self.screen.fill(CELESTE_CIELO)
@@ -214,14 +245,55 @@ class BBotConsola:
                 if self.juego.actualizar(accion): self.modo = "SUB_JUGAR"
                 else: self.juego.dibujar(self.screen)
 
-            elif self.modo == "SUB_CUENTOS":
-                self.dibujar_bot(t, x=680)
-                rect = pygame.Rect(50, 50, 520, 300)
-                pygame.draw.rect(self.screen, (255,255,240), rect, border_radius=15)
-                pygame.draw.rect(self.screen, (100,80,60), rect, 4, border_radius=15)
-                f_c = pygame.font.SysFont(FUENTE_RETRO, 20)
-                lineas = self.wrap(self.txt_cuento, f_c, 480)
-                for i, l in enumerate(lineas): self.screen.blit(f_c.render(l, True, (0,0,0)), (70, 80+i*35))
+# --- MENÚ DE SELECCIÓN DE CUENTOS ---
+            if self.modo == "SUB_CUENTOS":
+                self.cargar_lista_tales()
+                self.screen.fill(CELESTE_CIELO)
+                self.mostrar_t("BIBLIOTECA DE PABLO ALÍ", y=30, color=(0,0,0), size=30)
+                
+                # Listar cuentos (máximo 6 en pantalla para no amontonar)
+                for i, nombre in enumerate(self.lista_cuentos[:6]):
+                    c = (255,255,255) if self.idx_cuento == i else (50, 50, 50)
+                    bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
+                    rect = pygame.Rect(100, 90 + i*45, 600, 40)
+                    pygame.draw.rect(self.screen, bg, rect, border_radius=10)
+                    self.mostrar_t(nombre.replace(".txt", ""), 400, 98 + i*45, c, size=20)
+
+                if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(self.lista_cuentos)
+                elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(self.lista_cuentos)
+                elif accion == "A":
+                    contenido = self.leer_cuento(self.lista_cuentos[self.idx_cuento])
+                    self.paginas_cuento = self.preparar_paginas(contenido)
+                    self.pagina_actual = 0
+                    self.modo = "LEYENDO_CUENTO"
+
+            # --- MODO LECTURA POR PÁGINAS ---
+            elif self.modo == "LEYENDO_CUENTO":
+                self.screen.fill((255, 255, 245)) # Color papel
+                # Título del cuento arriba
+                titulo = self.lista_cuentos[self.idx_cuento].replace(".txt", "").upper()
+                self.mostrar_t(titulo, y=20, color=(100, 100, 100), size=16)
+
+                # Dibujar las líneas de la página actual
+                f_c = pygame.font.SysFont(FUENTE_RETRO, 22)
+                if self.paginas_cuento:
+                    for i, linea in enumerate(self.paginas_cuento[self.pagina_actual]):
+                        txt_surf = f_c.render(linea, True, (30, 30, 30))
+                        self.screen.blit(txt_surf, (50, 70 + i*35))
+
+                    # Indicador de página abajo
+                    info_pag = f"Página {self.pagina_actual + 1} de {len(self.paginas_cuento)}"
+                    self.mostrar_t(info_pag, y=360, color=(150, 150, 150), size=14)
+                
+                # Controles de lectura
+                if accion == "DERECHA" or accion == "A":
+                    if self.pagina_actual < len(self.paginas_cuento) - 1:
+                        self.pagina_actual += 1
+                elif accion == "IZQUIERDA":
+                    if self.pagina_actual > 0:
+                        self.pagina_actual -= 1
+                elif accion == "B" or accion == "SELECT":
+                    self.modo = "SUB_CUENTOS"
 
             elif self.modo == "SUB_MASCOTA":
                 self.dibujar_bot(t, size_mult=1.6)
