@@ -16,7 +16,7 @@ JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
 # ==========================================
-# GESTOR DE SPRITES B-BOT
+# GESTORES Y LÓGICA DE MASCOTA
 # ==========================================
 
 class BBotSpriteManager:
@@ -36,10 +36,6 @@ class BBotSpriteManager:
         sprite = self.sprites.get(name, self.sprites.get("neutral"))
         if size: return pygame.transform.scale(sprite, (size, size))
         return sprite
-
-# ==========================================
-# LÓGICA DE LA MASCOTA EXPERTA
-# ==========================================
 
 class BBotPet:
     def __init__(self, name="B-Bot"):
@@ -61,7 +57,7 @@ class BBotPet:
                 self.boredom = min(100, self.boredom + 2)
                 self.energy = max(0, self.energy - 2)
                 self.hygiene = max(0, self.hygiene - 2)
-                if (self.hygiene < 20 or self.hunger > 80) and random.random() < 0.3:
+                if (self.hygiene < 20 or self.hunger > 80) and random.random() < 0.2:
                     self.is_sick = True
             else:
                 self.energy = min(100, self.energy + 10)
@@ -77,7 +73,7 @@ class BBotPet:
         return "neutral"
 
 # ==========================================
-# LÓGICA DE JUEGOS
+# CLASES DE JUEGOS
 # ==========================================
 
 class JuegoNaves:
@@ -108,9 +104,7 @@ class JuegoNaves:
             s[0] = (s[0] - s[2]*2) % 800
             pygame.draw.circle(sc, (255,255,255), (int(s[0]), s[1]), 1)
         pygame.draw.rect(sc, (0,200,255), (self.x-20, 350, 40, 10))
-        pygame.draw.rect(sc, (255,255,255), (self.x-2, 330, 4, 20))
-        for e in self.enemigos:
-            pygame.draw.ellipse(sc, (200,100,255), (e[0]-22, e[1]-10, 44, 22))
+        for e in self.enemigos: pygame.draw.ellipse(sc, (200,100,255), (e[0]-22, e[1]-10, 44, 22))
         for b in self.balas: pygame.draw.rect(sc, (255,255,0), (b[0]-2, b[1], 4, 10))
 
 class JuegoCarreras:
@@ -170,40 +164,45 @@ class BBotConsola:
             self.joy = pygame.joystick.Joystick(0); self.joy.init()
         
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
+        pygame.display.set_caption("B-Bot Consola Pro")
+        pygame.mouse.set_visible(False)
         self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
         self.controles = {}
         
         self.sprite_manager = BBotSpriteManager(SPRITE_SHEET, JSON_CONFIG)
         self.mascota = BBotPet()
         self.historial_chistes = []
-        self.chiste_actual = {"setup": "Presiona A para un chiste", "punch": ""}
+        self.chiste_actual = {"setup": "Presiona A...", "punch": ""}
         
-        if os.path.exists(CONFIG_FILE):
+        # --- CARGAR CONFIGURACIÓN O INICIAR CONFIG ---
+        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
+        self.idx_cfg = 0
+
+        if not os.path.exists(CONFIG_FILE):
+            self.modo = "CONFIG"
+        else:
             with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
-        else: self.modo = "CONFIG"
 
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.tales_dir = os.path.join(self.base_path, "tales")
+        if not os.path.exists(self.tales_dir): os.makedirs(self.tales_dir)
+        
         self.rect_cuento = pygame.Rect(320, 55, 440, 285)
         self.seleccion = 0; self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0
-        self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
-        self.idx_cfg = 0
 
     def obtener_nuevo_chiste(self):
         try:
             r = requests.get("https://official-joke-api.appspot.com/jokes/random", timeout=2)
-            d = r.json()
-            if d["setup"] not in self.historial_chistes:
-                self.chiste_actual = {"setup": d["setup"], "punch": d["punchline"]}
-                self.historial_chistes.append(d["setup"])
-                if len(self.historial_chistes) > 10: self.historial_chistes.pop(0)
-        except: self.chiste_actual = {"setup": "Sin conexión...", "punch": "¡Cuéntame uno tú!"}
+            d = r.json(); self.chiste_actual = {"setup": d["setup"], "punch": d["punchline"]}
+        except: self.chiste_actual = {"setup": "Sin internet...", "punch": "¡Cuéntame uno tú!"}
 
     def obtener_accion(self, ev):
         if not self.controles: return None
         for accion, m in self.controles.items():
             if ev.type == pygame.JOYBUTTONDOWN and m.get("tipo") == "btn" and ev.button == m["val"]: return accion
             if ev.type == pygame.JOYHATMOTION and m.get("tipo") == "hat" and list(ev.value) == m["val"]: return accion
+            if ev.type == pygame.JOYAXISMOTION and m.get("tipo") == "axis" and ev.axis == m["axis"]:
+                if (ev.value > 0.7 and m["val"] == 1) or (ev.value < -0.7 and m["val"] == -1): return accion
         if ev.type == pygame.KEYDOWN:
             keys = {pygame.K_LEFT: "IZQUIERDA", pygame.K_RIGHT: "DERECHA", pygame.K_UP: "ARRIBA", 
                     pygame.K_DOWN: "ABAJO", pygame.K_RETURN: "A", pygame.K_b: "B", 
@@ -229,21 +228,34 @@ class BBotConsola:
             
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
+                
+                # --- LÓGICA DE CONFIGURACIÓN DEL MANDO ---
                 if self.modo == "CONFIG":
                     m = None
                     if ev.type == pygame.JOYBUTTONDOWN: m = {"tipo": "btn", "val": ev.button}
                     elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0): m = {"tipo": "hat", "val": list(ev.value)}
+                    elif ev.type == pygame.JOYAXISMOTION and abs(ev.value) > 0.8:
+                        m = {"tipo": "axis", "axis": ev.axis, "val": 1 if ev.value > 0 else -1}
+                    
                     if m:
                         self.controles[self.pasos_cfg[self.idx_cfg]] = m
                         self.idx_cfg += 1
+                        pygame.time.delay(400)
                         if self.idx_cfg >= len(self.pasos_cfg):
                             with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
                             self.modo = "MENU"
-                else: accion = self.obtener_accion(ev)
+                else:
+                    accion = self.obtener_accion(ev)
 
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
 
-            if self.modo == "MENU":
+            # --- PANTALLA DE CONFIGURACIÓN VISUAL ---
+            if self.modo == "CONFIG":
+                self.mostrar_t("CONFIGURAR MANDO 8BITDO", y=100, color=(0,0,0), size=30)
+                self.mostrar_t(f"PULSA EL BOTÓN PARA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
+                self.mostrar_t("MUEVE LA CRUCETA O PULSA UN BOTÓN", y=300, color=(50,50,50), size=18)
+
+            elif self.modo == "MENU":
                 sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=160)
                 flot = math.sin(t * 0.005) * 12
                 self.screen.blit(sprite, (320, 100 + flot))
@@ -284,8 +296,8 @@ class BBotConsola:
                 self.dibujar_barra(600, 240, "ENERGÍA", self.mascota.energy, (255, 200, 0))
                 self.dibujar_barra(600, 300, "ENTRENA", self.mascota.training, (100, 255, 100))
                 if self.mascota.is_sick: self.mostrar_t("¡ENFERMO! PULSA R", 400, 210, (255,0,0), 20)
-                if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25); self.mascota.hygiene = max(0, self.hygiene - 5)
-                elif accion == "X": self.mascota.hunger = max(0, self.mascota.hunger - 10); self.mascota.training = min(100, self.mascota.training + 5)
+                if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25)
+                elif accion == "X": self.mascota.hunger = max(0, self.mascota.hunger - 10); self.mascota.training += 5
                 elif accion == "B": self.mascota.hygiene = 100
                 elif accion == "A": self.mascota.is_sleeping = not self.mascota.is_sleeping
                 elif accion == "L": self.mascota.training = min(100, self.mascota.training + 10)
@@ -307,14 +319,15 @@ class BBotConsola:
                 elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(archivos)
                 elif accion == "A":
                     with open(os.path.join(self.tales_dir, archivos[self.idx_cuento]), 'r', encoding='utf-8') as f:
-                        self.paginas_cuento = [self.wrap_mejorado(f.read(), pygame.font.SysFont(FUENTE_RETRO, 20), 390)[i:i+9] for i in range(0, 50, 9)]
+                        txt = f.read()
+                        self.paginas_cuento = [self.wrap_mejorado(txt, pygame.font.SysFont(FUENTE_RETRO, 20), 390)[i:i+9] for i in range(0, 100, 9)]
                     self.pagina_actual = 0; self.modo = "LEYENDO_CUENTO"
 
             elif self.modo == "LEYENDO_CUENTO":
                 sprite = self.sprite_manager.get_sprite("leyendo", size=180)
                 self.screen.blit(sprite, (50, 100))
                 pygame.draw.rect(self.screen, (255, 255, 245), self.rect_cuento, border_radius=15)
-                if self.paginas_cuento:
+                if self.paginas_cuento and self.pagina_actual < len(self.paginas_cuento):
                     for i, lin in enumerate(self.paginas_cuento[self.pagina_actual]):
                         self.screen.blit(pygame.font.SysFont(FUENTE_RETRO, 20).render(lin, True, (30,30,30)), (345, 85 + i*28))
                 if accion in ["DERECHA", "A"] and self.pagina_actual < len(self.paginas_cuento)-1: self.pagina_actual += 1
