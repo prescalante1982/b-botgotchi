@@ -5,6 +5,7 @@ import time
 import math
 import random
 import requests
+import threading
 
 # --- CONFIGURACIÓN ESTÉTICA Y API ---
 ANCHO, ALTO = 800, 400
@@ -20,7 +21,7 @@ API_KEY_WEATHER = "2f9b383d006c73b7d2d11226c5fdd10d"
 CIUDAD = "Guatemala City"
 
 # ==========================================
-# GESTORES DE ENTORNO (CLIMA)
+# GESTORES DE ENTORNO (CLIMA ASÍNCRONO)
 # ==========================================
 
 class WeatherManager:
@@ -29,24 +30,30 @@ class WeatherManager:
         self.es_noche = False
         self.ultimo_check = 0
         self.temp = 25
+        self.actualizando = False
         self.particulas = [[random.randint(0, 800), random.randint(0, 400)] for _ in range(60)]
+
+    def _request_weather(self):
+        try:
+            url = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY_WEATHER}&units=metric"
+            r = requests.get(url, timeout=2)
+            if r.status_code == 200:
+                data = r.json()
+                self.clima_actual = data["weather"][0]["main"]
+                self.temp = int(data["main"]["temp"])
+                hora = time.localtime().tm_hour
+                self.es_noche = hora < 6 or hora > 18
+        except:
+            pass
+        self.actualizando = False
 
     def actualizar(self):
         ahora = pygame.time.get_ticks()
-        # Actualiza cada 10 min para cuidar la API
-        if ahora - self.ultimo_check > 600000 or self.ultimo_check == 0:
-            try:
-                url = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY_WEATHER}&units=metric"
-                r = requests.get(url, timeout=3)
-                data = r.json()
-                if r.status_code == 200:
-                    self.clima_actual = data["weather"][0]["main"]
-                    self.temp = data["main"]["temp"]
-                    hora = time.localtime().tm_hour
-                    self.es_noche = hora < 6 or hora > 18
-                    self.ultimo_check = ahora
-            except:
-                pass
+        # Cada 10 min y si no hay otra petición en curso
+        if (ahora - self.ultimo_check > 600000 or self.ultimo_check == 0) and not self.actualizando:
+            self.actualizando = True
+            self.ultimo_check = ahora
+            threading.Thread(target=self._request_weather, daemon=True).start()
 
     def dibujar_efectos(self, sc):
         color = (180, 180, 255) if self.clima_actual == "Rain" else (255, 255, 255)
@@ -64,12 +71,7 @@ class WeatherManager:
 
     def obtener_fondo(self):
         if self.es_noche: return (15, 15, 45)
-        climas = {
-            "Clear": (135, 206, 235),
-            "Clouds": (160, 175, 190),
-            "Rain": (75, 85, 95),
-            "Snow": (220, 230, 240)
-        }
+        climas = {"Clear": (135, 206, 235), "Clouds": (160, 175, 190), "Rain": (75, 85, 95), "Snow": (220, 230, 240)}
         return climas.get(self.clima_actual, CELESTE_CIELO)
 
 # ==========================================
@@ -82,8 +84,11 @@ class BBotSpriteManager:
             self.atlas = pygame.Surface((1024, 1024), pygame.SRCALPHA)
         else:
             self.atlas = pygame.image.load(atlas_path).convert_alpha()
-        with open(json_path, 'r') as f:
-            self.data = json.load(f)
+        try:
+            with open(json_path, 'r') as f: self.data = json.load(f)
+        except:
+            self.data = {"expressions": {"neutral": {"x":0, "y":0, "w":100, "h":100}}}
+        
         self.sprites = {}
         for name, pos in self.data["expressions"].items():
             rect = pygame.Rect(pos["x"], pos["y"], pos["w"], pos["h"])
@@ -96,14 +101,18 @@ class BBotSpriteManager:
 
 class BBotPet:
     def __init__(self):
-        self.hunger = 20
-        self.energy = 100
-        self.hygiene = 100
-        self.training = 0
-        self.is_sleeping = False
-        self.is_sick = False
+        self.hunger, self.energy, self.hygiene, self.training = 20, 100, 100, 0
+        self.is_sleeping = self.is_sick = False
         self.last_tick = pygame.time.get_ticks()
         self.pensamiento = "¡Hola, Pablo!"
+        # Lista de chistes en español integrada
+        self.chistes_esp = [
+            {"s": "¿Qué le dice un jaguar a otro?", "p": "¡Jaguar you!"},
+            {"s": "¿Por qué el libro de matemáticas está triste?", "p": "Porque tiene muchos problemas."},
+            {"s": "¿Qué hace una abeja en el gimnasio?", "p": "¡Zumba!"},
+            {"s": "¿Cómo se dice pañuelo en japonés?", "p": "Saca-moko."},
+            {"s": "¿Cuál es el baile favorito del tomate?", "p": "¡La salsa!"}
+        ]
 
     def clock_tick(self, clima):
         ahora = pygame.time.get_ticks()
@@ -114,13 +123,9 @@ class BBotPet:
                 self.hygiene = max(0, self.hygiene - 2)
                 if (self.hygiene < 20 or self.hunger > 80) and random.random() < 0.2:
                     self.is_sick = True
-                
-                # Pensamientos inteligentes basados en Clima
-                if clima == "Rain": self.pensamiento = "¡Mejor me quedo adentro!"
-                elif clima == "Clear": self.pensamiento = "¡Qué buen día hace!"
-                elif self.hunger > 70: self.pensamiento = "¡Tengo hambre! [Y]"
-                elif random.random() < 0.2: 
-                    self.pensamiento = random.choice(["Bip Bup...", "¡Me gusta el código!", "Soy Pro", "Guatemala <3"])
+                if clima == "Rain": self.pensamiento = "¡Prefiero estar seco!"
+                elif random.random() < 0.2:
+                    self.pensamiento = random.choice(["Bip Bup Bap", "¡Programar es genial!", "Guatemala <3"])
             else:
                 self.energy = min(100, self.energy + 10)
                 if self.energy >= 100: self.is_sleeping = False
@@ -129,15 +134,13 @@ class BBotPet:
     def mood_expression(self):
         if self.is_sick: return "error"
         if self.is_sleeping: return "durmiendo"
-        if self.hygiene < 30: return "mareado"
         if self.hunger > 70: return "triste"
-        if self.training > 80: return "con_lentes"
         return "neutral"
 
 # ==========================================
-# JUEGOS (Naves, Carreras, Pacman)
+# JUEGOS (Sin cambios para estabilidad)
 # ==========================================
-
+# (Clases JuegoNaves, JuegoCarreras, JuegoPacman se mantienen igual)
 class JuegoNaves:
     def __init__(self):
         self.x = 400; self.balas = []; self.enemigos = []; self.puntos = 0; self.vidas = 3
@@ -234,7 +237,7 @@ class BBotConsola:
         self.sprite_manager = BBotSpriteManager(SPRITE_SHEET, JSON_CONFIG)
         self.mascota = BBotPet()
         self.weather = WeatherManager()
-        self.chiste_actual = {"setup": "Presiona A...", "punch": ""}
+        self.chiste_actual = {"setup": "Cargando...", "punch": ""}
         
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
         self.idx_cfg = 0
@@ -250,12 +253,22 @@ class BBotConsola:
         
         self.rect_cuento = pygame.Rect(320, 55, 440, 285)
         self.seleccion = 0; self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0
+        self.paginas_cuento = []
 
     def obtener_nuevo_chiste(self):
-        try:
-            r = requests.get("https://official-joke-api.appspot.com/jokes/random", timeout=2)
-            d = r.json(); self.chiste_actual = {"setup": d["setup"], "punch": d["punchline"]}
-        except: self.chiste_actual = {"setup": "Sin internet...", "punch": "¡Cuéntame uno tú!"}
+        # Chistes rápidos desde la lista interna (sin lentitud de red)
+        ch = random.choice(self.mascota.chistes_esp)
+        self.chiste_actual = {"setup": ch["s"], "punch": ch["p"]}
+
+    def wrap_mejorado(self, texto, fuente, ancho_max):
+        lineas = []; parrafos = texto.split('\n')
+        for p in parrafos:
+            palabras = p.split(' '); l_act = ""
+            for pal in palabras:
+                if fuente.size(l_act + pal)[0] < ancho_max: l_act += pal + " "
+                else: lineas.append(l_act.strip()); l_act = pal + " "
+            lineas.append(l_act.strip())
+        return lineas
 
     def obtener_accion(self, ev):
         if not self.controles: return None
@@ -307,7 +320,6 @@ class BBotConsola:
                 self.mostrar_t(f"PULSA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
 
             elif self.modo == "MENU":
-                # Info Clima Superior
                 color_txt = (255,255,255) if self.weather.es_noche else (0,0,0)
                 self.mostrar_t(f"{CIUDAD}: {self.weather.temp}°C | {self.weather.clima_actual}", 180, 10, color_txt, 14)
                 
@@ -339,7 +351,6 @@ class BBotConsola:
                 self.dibujar_barra(50, 310, "HIGIENE [B]", self.mascota.hygiene, (50, 200, 200))
                 self.dibujar_barra(550, 240, "ENERGÍA [A]", self.mascota.energy, (255, 200, 0))
                 self.dibujar_barra(550, 310, "ENTRENA [L]", self.mascota.training, (100, 255, 100))
-                
                 if self.mascota.is_sick: self.mostrar_t("¡ENFERMO! [R]", 400, 220, (255,0,0), 22)
                 
                 if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25)
@@ -373,18 +384,24 @@ class BBotConsola:
                 if accion == "A": self.obtener_nuevo_chiste()
 
             elif self.modo == "SUB_CUENTOS":
-                archivos = sorted([f for f in os.listdir(self.tales_dir) if f.endswith('.txt')])
-                for i, nombre in enumerate(archivos[:6]):
-                    bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
-                    pygame.draw.rect(self.screen, bg, (100, 90 + i*45, 600, 40), border_radius=10)
-                    self.mostrar_t(nombre.replace(".txt", ""), 400, 98 + i*45, (255,255,255), size=20)
-                if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(archivos)
-                elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(archivos)
-                elif accion == "A":
-                    with open(os.path.join(self.tales_dir, archivos[self.idx_cuento]), 'r', encoding='utf-8') as f:
-                        txt = f.read()
-                        self.paginas_cuento = [self.wrap_mejorado(txt, pygame.font.SysFont(FUENTE_RETRO, 20), 390)[i:i+9] for i in range(0, 100, 9)]
-                    self.pagina_actual = 0; self.modo = "LEYENDO_CUENTO"
+                try:
+                    archivos = sorted([f for f in os.listdir(self.tales_dir) if f.endswith('.txt')])
+                    if not archivos:
+                        self.mostrar_t("Añade archivos .txt a la carpeta 'tales'", 400, 200, (0,0,0), 18)
+                    else:
+                        for i, nombre in enumerate(archivos[:6]):
+                            bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
+                            pygame.draw.rect(self.screen, bg, (100, 90 + i*45, 600, 40), border_radius=10)
+                            self.mostrar_t(nombre.replace(".txt", ""), 400, 98 + i*45, (255,255,255), size=20)
+                        if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(archivos)
+                        elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(archivos)
+                        elif accion == "A":
+                            with open(os.path.join(self.tales_dir, archivos[self.idx_cuento]), 'r', encoding='utf-8') as f:
+                                txt = f.read()
+                                self.paginas_cuento = [self.wrap_mejorado(txt, pygame.font.SysFont(FUENTE_RETRO, 20), 390)[i:i+9] for i in range(0, 1000, 9) if i < len(self.wrap_mejorado(txt, pygame.font.SysFont(FUENTE_RETRO, 20), 390))]
+                            self.pagina_actual = 0; self.modo = "LEYENDO_CUENTO"
+                except:
+                    self.mostrar_t("Error al leer la carpeta de cuentos", 400, 200, (255,0,0), 18)
 
             elif self.modo == "LEYENDO_CUENTO":
                 sprite = self.sprite_manager.get_sprite("leyendo", size=180)
