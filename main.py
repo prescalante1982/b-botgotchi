@@ -10,6 +10,8 @@ ANCHO, ALTO = 800, 400
 CELESTE_CIELO = (173, 216, 230)
 NEGRO_ESPACIO = (10, 10, 30)
 CONFIG_FILE = "config_pablo.json"
+SPRITE_SHEET = "bbot_sprite_sheet.PNG" # Tu nueva imagen transparente
+JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
 # ==========================================
@@ -19,10 +21,10 @@ FUENTE_RETRO = "Courier New"
 class BBotSpriteManager:
     def __init__(self, atlas_path, json_path):
         if not os.path.exists(atlas_path):
-            print(f"ERROR: No se encuentra {atlas_path}")
-            # Creamos una superficie vacía para no romper el programa si falta la imagen
+            print(f"ALERTA: No se encuentra {atlas_path}. Usando placeholder.")
             self.atlas = pygame.Surface((1024, 1024), pygame.SRCALPHA)
         else:
+            # .convert_alpha() es vital para la transparencia
             self.atlas = pygame.image.load(atlas_path).convert_alpha()
             
         with open(json_path, 'r') as f:
@@ -149,8 +151,8 @@ class BBotConsola:
         self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
         self.controles = {}
         
-        # --- NUEVO: Gestor de Sprites ---
-        self.sprite_manager = BBotSpriteManager("bbot_sprite_sheet.PNG", "bbot_mascota.json")
+        # Gestor de Sprites con la nueva imagen transparente
+        self.sprite_manager = BBotSpriteManager(SPRITE_SHEET, JSON_CONFIG)
         
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
         self.idx_cfg = 0
@@ -183,7 +185,7 @@ class BBotConsola:
             if ev.key == pygame.K_RIGHT: return "DERECHA"
             if ev.key == pygame.K_UP: return "ARRIBA"
             if ev.key == pygame.K_DOWN: return "ABAJO"
-            if ev.key == pygame.K_SPACE or ev.key == pygame.K_RETURN: return "A"
+            if ev.key in [pygame.K_SPACE, pygame.K_RETURN]: return "A"
             if ev.key == pygame.K_b: return "B"
             if ev.key == pygame.K_ESCAPE: return "SELECT"
         return None
@@ -206,12 +208,8 @@ class BBotConsola:
             palabras = p.split(' ')
             linea_act = ""
             for pal in palabras:
-                test_linea = linea_act + pal + " "
-                if fuente.size(test_linea)[0] < ancho_max:
-                    linea_act = test_linea
-                else:
-                    lineas.append(linea_act.strip())
-                    linea_act = pal + " "
+                if fuente.size(linea_act + pal)[0] < ancho_max: linea_act += pal + " "
+                else: lineas.append(linea_act.strip()); linea_act = pal + " "
             lineas.append(linea_act.strip())
         return lineas
 
@@ -230,7 +228,6 @@ class BBotConsola:
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
                 if self.modo == "CONFIG":
-                    # Lógica de configuración...
                     m = None
                     if ev.type == pygame.JOYBUTTONDOWN: m = {"tipo": "btn", "val": ev.button}
                     elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0): m = {"tipo": "hat", "val": list(ev.value)}
@@ -247,7 +244,7 @@ class BBotConsola:
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
 
             if self.modo == "MENU":
-                # B-Bot Alegre Flotando
+                # B-Bot Alegre Flotando (Transparente)
                 sprite = self.sprite_manager.get_sprite("alegre", size=160)
                 flotacion = math.sin(t * 0.005) * 12
                 self.screen.blit(sprite, (400 - 80, 100 + flotacion))
@@ -279,7 +276,7 @@ class BBotConsola:
 
             elif self.modo == "LEYENDO_CUENTO":
                 self.screen.fill(CELESTE_CIELO)
-                # B-Bot Leyendo
+                # B-Bot Leyendo (Transparente)
                 sprite = self.sprite_manager.get_sprite("leyendo", size=180)
                 self.screen.blit(sprite, (50, 100))
                 
@@ -292,14 +289,14 @@ class BBotConsola:
                         self.screen.blit(f_c.render(linea, True, (30, 30, 30)), (345, 85 + i * 28))
                     self.mostrar_t(f"{self.pagina_actual+1}/{len(self.paginas_cuento)}", x=540, y=350, color=(80,80,80), size=16)
 
-                if accion == "DERECHA" or accion == "A":
+                if accion in ["DERECHA", "A"]:
                     if self.pagina_actual < len(self.paginas_cuento) - 1: self.pagina_actual += 1; pygame.time.delay(200)
                 elif accion == "IZQUIERDA":
                     if self.pagina_actual > 0: self.pagina_actual -= 1; pygame.time.delay(200)
-                elif accion == "B" or accion == "SELECT": self.modo = "SUB_CUENTOS"
+                elif accion in ["B", "SELECT"]: self.modo = "SUB_CUENTOS"
 
             elif self.modo == "SUB_MASCOTA":
-                # B-Bot Grande
+                # B-Bot Grande y Neutral
                 sprite = self.sprite_manager.get_sprite("neutral", size=240)
                 self.screen.blit(sprite, (400 - 120, 60))
                 self.mostrar_t("MODO MASCOTA (PRÓXIMAMENTE)", y=320, color=(0,0,0), size=25)
