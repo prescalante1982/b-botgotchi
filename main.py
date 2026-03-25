@@ -34,7 +34,7 @@ class BBotSpriteManager:
 
     def get_sprite(self, name, size=None):
         sprite = self.sprites.get(name, self.sprites.get("neutral"))
-        if size: return pygame.transform.scale(sprite, (size, size))
+        if size: return pygame.transform.scale(sprite, (int(size), int(size)))
         return sprite
 
 class BBotPet:
@@ -48,6 +48,8 @@ class BBotPet:
         self.is_sleeping = False
         self.is_sick = False
         self.last_tick = pygame.time.get_ticks()
+        self.pensamiento = "¡Hola, Pablo!"
+        self.timer_pensamiento = 0
 
     def clock_tick(self):
         ahora = pygame.time.get_ticks()
@@ -62,6 +64,16 @@ class BBotPet:
             else:
                 self.energy = min(100, self.energy + 10)
                 if self.energy >= 100: self.is_sleeping = False
+            
+            # IA de pensamientos
+            if not self.is_sleeping:
+                if self.is_sick: self.pensamiento = "Me siento mal... [R]"
+                elif self.hunger > 70: self.pensamiento = "¡Tengo mucha hambre! [Y]"
+                elif self.hygiene < 30: self.pensamiento = "Necesito un baño... [B]"
+                elif self.energy < 25: self.pensamiento = "Zzz... qué sueño... [A]"
+                elif random.random() < 0.3:
+                    self.pensamiento = random.choice(["¡Amo programar!", "¡Mira mis circuitos!", "¿Jugamos?", "Bip Bup Bap"])
+            
             self.last_tick = ahora
 
     def mood_expression(self):
@@ -73,7 +85,7 @@ class BBotPet:
         return "neutral"
 
 # ==========================================
-# CLASES DE JUEGOS
+# CLASES DE JUEGOS (Sin cambios para mantener estabilidad)
 # ==========================================
 
 class JuegoNaves:
@@ -171,10 +183,8 @@ class BBotConsola:
         
         self.sprite_manager = BBotSpriteManager(SPRITE_SHEET, JSON_CONFIG)
         self.mascota = BBotPet()
-        self.historial_chistes = []
         self.chiste_actual = {"setup": "Presiona A...", "punch": ""}
         
-        # --- CARGAR CONFIGURACIÓN O INICIAR CONFIG ---
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
         self.idx_cfg = 0
 
@@ -228,15 +238,12 @@ class BBotConsola:
             
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
-                
-                # --- LÓGICA DE CONFIGURACIÓN DEL MANDO ---
                 if self.modo == "CONFIG":
                     m = None
                     if ev.type == pygame.JOYBUTTONDOWN: m = {"tipo": "btn", "val": ev.button}
                     elif ev.type == pygame.JOYHATMOTION and ev.value != (0,0): m = {"tipo": "hat", "val": list(ev.value)}
                     elif ev.type == pygame.JOYAXISMOTION and abs(ev.value) > 0.8:
                         m = {"tipo": "axis", "axis": ev.axis, "val": 1 if ev.value > 0 else -1}
-                    
                     if m:
                         self.controles[self.pasos_cfg[self.idx_cfg]] = m
                         self.idx_cfg += 1
@@ -249,27 +256,61 @@ class BBotConsola:
 
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
 
-            # --- PANTALLA DE CONFIGURACIÓN VISUAL ---
             if self.modo == "CONFIG":
                 self.mostrar_t("CONFIGURAR MANDO 8BITDO", y=100, color=(0,0,0), size=30)
                 self.mostrar_t(f"PULSA EL BOTÓN PARA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
-                self.mostrar_t("MUEVE LA CRUCETA O PULSA UN BOTÓN", y=300, color=(50,50,50), size=18)
 
             elif self.modo == "MENU":
-                sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=160)
+                # Animación de escala "respiración" + flotación
+                latido = 1.0 + math.sin(t * 0.003) * 0.05
                 flot = math.sin(t * 0.005) * 12
-                self.screen.blit(sprite, (320, 100 + flot))
+                sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=160 * latido)
+                self.screen.blit(sprite, (ANCHO//2 - sprite.get_width()//2, 100 + flot))
+                
+                # Burbuja de pensamiento
+                if not self.mascota.is_sleeping:
+                    pygame.draw.ellipse(self.screen, (255,255,255), (ANCHO//2 + 60, 60, 220, 60))
+                    self.mostrar_t(self.mascota.pensamiento, ANCHO//2 + 170, 80, (50,50,50), size=16)
+
                 opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
                 for i, opt in enumerate(opts):
                     c = (255,255,255) if self.seleccion == i else (140, 190, 210)
                     pygame.draw.rect(self.screen, c, (40+i*185, 310, 165, 50), border_radius=15)
                     self.mostrar_t(opt, 40+i*185+82, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
+                
                 if accion == "DERECHA": self.seleccion = (self.seleccion+1)%4
                 elif accion == "IZQUIERDA": self.seleccion = (self.seleccion-1)%4
                 elif accion == "A": 
                     self.modo = "SUB_" + opts[self.seleccion]
                     if self.modo == "SUB_CHISTES": self.obtener_nuevo_chiste()
 
+            elif self.modo == "SUB_MASCOTA":
+                # B-Bot más grande en su perfil
+                latido = 1.0 + math.sin(t * 0.004) * 0.03
+                sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=200 * latido)
+                self.screen.blit(sprite, (ANCHO//2 - sprite.get_width()//2, 20))
+                
+                # Barras mejoradas (Más grandes y con texto de botones)
+                self.dibujar_barra(50, 240, "HAMBRE [Y]", self.mascota.hunger, (200, 50, 50))
+                self.dibujar_barra(50, 310, "HIGIENE [B]", self.mascota.hygiene, (50, 200, 200))
+                self.dibujar_barra(550, 240, "ENERGÍA [A]", self.mascota.energy, (255, 200, 0))
+                self.dibujar_barra(550, 310, "ENTRENA [L]", self.mascota.training, (100, 255, 100))
+                
+                if self.mascota.is_sick: self.mostrar_t("¡ENFERMO! PULSA [R]", 400, 220, (255,0,0), 22)
+                
+                # Lógica de botones (Sin cambios, solo mejora visual)
+                if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25); self.mascota.pensamiento = "¡Rico!"
+                elif accion == "X": self.mascota.hunger = max(0, self.mascota.hunger - 10); self.mascota.training += 5
+                elif accion == "B": self.mascota.hygiene = 100; self.mascota.pensamiento = "¡Qué limpio!"
+                elif accion == "A": self.mascota.is_sleeping = not self.mascota.is_sleeping
+                elif accion == "L": self.mascota.training = min(100, self.mascota.training + 10)
+                elif accion == "R" and self.mascota.is_sick: self.mascota.is_sick = False; self.mascota.pensamiento = "¡Mejor!"
+
+            elif self.modo == "EN_JUEGO":
+                if self.juego.actualizar(accion): self.modo = "SUB_JUGAR"
+                else: self.juego.dibujar(self.screen)
+            
+            # --- SECCIONES RESTANTES (CHISTES, CUENTOS, JUGAR) ---
             elif self.modo == "SUB_JUGAR":
                 jgs = ["NAVES", "CARROS", "PACMAN"]
                 for i, j in enumerate(jgs):
@@ -284,33 +325,16 @@ class BBotConsola:
                     elif self.sel_juego == 1: self.juego = JuegoCarreras()
                     else: self.juego = JuegoPacman()
 
-            elif self.modo == "EN_JUEGO":
-                if self.juego.actualizar(accion): self.modo = "SUB_JUGAR"
-                else: self.juego.dibujar(self.screen)
-
-            elif self.modo == "SUB_MASCOTA":
-                sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=180)
-                self.screen.blit(sprite, (310, 30))
-                self.dibujar_barra(50, 240, "HAMBRE", self.mascota.hunger, (200, 50, 50))
-                self.dibujar_barra(50, 300, "HIGIENE", self.mascota.hygiene, (50, 200, 200))
-                self.dibujar_barra(600, 240, "ENERGÍA", self.mascota.energy, (255, 200, 0))
-                self.dibujar_barra(600, 300, "ENTRENA", self.mascota.training, (100, 255, 100))
-                if self.mascota.is_sick: self.mostrar_t("¡ENFERMO! PULSA R", 400, 210, (255,0,0), 20)
-                if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25)
-                elif accion == "X": self.mascota.hunger = max(0, self.mascota.hunger - 10); self.mascota.training += 5
-                elif accion == "B": self.mascota.hygiene = 100
-                elif accion == "A": self.mascota.is_sleeping = not self.mascota.is_sleeping
-                elif accion == "L": self.mascota.training = min(100, self.mascota.training + 10)
-                elif accion == "R" and self.mascota.is_sick: self.mascota.is_sick = False
-
             elif self.modo == "SUB_CHISTES":
                 pygame.draw.rect(self.screen, (255,255,255), (100, 100, 600, 200), border_radius=15)
                 self.mostrar_t(self.chiste_actual["setup"], 400, 140, (0,0,0), 18)
                 self.mostrar_t(self.chiste_actual["punch"], 400, 220, (200,0,0), 22)
+                self.mostrar_t("PULSA [A] PARA OTRO", 400, 270, (100,100,100), 14)
                 if accion == "A": self.obtener_nuevo_chiste()
 
             elif self.modo == "SUB_CUENTOS":
                 archivos = [f for f in os.listdir(self.tales_dir) if f.endswith('.txt')]
+                if not archivos: self.mostrar_t("AÑADE .TXT A LA CARPETA 'TALES'", y=180, color=(0,0,0))
                 for i, nombre in enumerate(archivos[:6]):
                     bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
                     pygame.draw.rect(self.screen, bg, (100, 90 + i*45, 600, 40), border_radius=10)
@@ -336,13 +360,18 @@ class BBotConsola:
             pygame.display.flip(); self.clock.tick(60)
 
     def dibujar_barra(self, x, y, nom, val, col):
-        pygame.draw.rect(self.screen, (0,0,0), (x, y, 150, 15), 2)
-        pygame.draw.rect(self.screen, col, (x+2, y+2, int(val * 1.46), 11))
-        self.mostrar_t(nom, x + 75, y - 15, (0,0,0) if not self.mascota.is_sleeping else (255,255,255), 14)
+        # Barra de fondo más ancha
+        pygame.draw.rect(self.screen, (50,50,50), (x, y, 200, 25), border_radius=5)
+        # Relleno
+        pygame.draw.rect(self.screen, col, (x+2, y+2, int(val * 1.96), 21), border_radius=5)
+        # Nombre y Porcentaje más grandes
+        txt_display = f"{nom}: {int(val)}%"
+        self.mostrar_t(txt_display, x + 100, y - 25, (0,0,0) if not self.mascota.is_sleeping else (255,255,255), 18)
 
     def mostrar_t(self, txt, x=400, y=200, color=(255,255,255), size=22):
         f = pygame.font.SysFont(FUENTE_RETRO, size, True)
         s = f.render(str(txt), True, color)
         self.screen.blit(s, (x - s.get_width()//2, y))
 
-if __name__ == "__main__": BBotConsola().run()
+if __name__ == "__main__": 
+    BBotConsola().run()
