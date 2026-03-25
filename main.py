@@ -6,7 +6,7 @@ import math
 import random
 import requests
 
-# --- CONFIGURACIÓN ESTÉTICA ---
+# --- CONFIGURACIÓN ESTÉTICA Y API ---
 ANCHO, ALTO = 800, 400
 CELESTE_CIELO = (173, 216, 230)
 NEGRO_ESPACIO = (10, 10, 30)
@@ -15,8 +15,65 @@ SPRITE_SHEET = "bbot_sprite_sheet.PNG"
 JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
+# CONFIGURACIÓN CLIMA
+API_KEY_WEATHER = "2f9b383d006c73b7d2d11226c5fdd10d"
+CIUDAD = "Guatemala City"
+
 # ==========================================
-# GESTORES Y LÓGICA DE MASCOTA
+# GESTORES DE ENTORNO (CLIMA)
+# ==========================================
+
+class WeatherManager:
+    def __init__(self):
+        self.clima_actual = "Clear"
+        self.es_noche = False
+        self.ultimo_check = 0
+        self.temp = 25
+        self.particulas = [[random.randint(0, 800), random.randint(0, 400)] for _ in range(60)]
+
+    def actualizar(self):
+        ahora = pygame.time.get_ticks()
+        # Actualiza cada 10 min para cuidar la API
+        if ahora - self.ultimo_check > 600000 or self.ultimo_check == 0:
+            try:
+                url = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY_WEATHER}&units=metric"
+                r = requests.get(url, timeout=3)
+                data = r.json()
+                if r.status_code == 200:
+                    self.clima_actual = data["weather"][0]["main"]
+                    self.temp = data["main"]["temp"]
+                    hora = time.localtime().tm_hour
+                    self.es_noche = hora < 6 or hora > 18
+                    self.ultimo_check = ahora
+            except:
+                pass
+
+    def dibujar_efectos(self, sc):
+        color = (180, 180, 255) if self.clima_actual == "Rain" else (255, 255, 255)
+        if self.clima_actual in ["Rain", "Drizzle", "Snow", "Clouds"]:
+            for p in self.particulas:
+                if self.clima_actual in ["Rain", "Drizzle"]:
+                    p[1] += 12
+                    pygame.draw.line(sc, color, (p[0], p[1]), (p[0], p[1]+6), 1)
+                elif self.clima_actual == "Snow":
+                    p[1] += 2
+                    p[0] += math.sin(pygame.time.get_ticks() * 0.002)
+                    pygame.draw.circle(sc, color, (int(p[0]), int(p[1])), 2)
+                
+                if p[1] > 400: p[1] = -10; p[0] = random.randint(0, 800)
+
+    def obtener_fondo(self):
+        if self.es_noche: return (15, 15, 45)
+        climas = {
+            "Clear": (135, 206, 235),
+            "Clouds": (160, 175, 190),
+            "Rain": (75, 85, 95),
+            "Snow": (220, 230, 240)
+        }
+        return climas.get(self.clima_actual, CELESTE_CIELO)
+
+# ==========================================
+# LÓGICA DE MASCOTA
 # ==========================================
 
 class BBotSpriteManager:
@@ -38,10 +95,8 @@ class BBotSpriteManager:
         return sprite
 
 class BBotPet:
-    def __init__(self, name="B-Bot"):
-        self.name = name
+    def __init__(self):
         self.hunger = 20
-        self.boredom = 20
         self.energy = 100
         self.hygiene = 100
         self.training = 0
@@ -49,31 +104,26 @@ class BBotPet:
         self.is_sick = False
         self.last_tick = pygame.time.get_ticks()
         self.pensamiento = "¡Hola, Pablo!"
-        self.timer_pensamiento = 0
 
-    def clock_tick(self):
+    def clock_tick(self, clima):
         ahora = pygame.time.get_ticks()
         if ahora - self.last_tick > 8000:
             if not self.is_sleeping:
                 self.hunger = min(100, self.hunger + 3)
-                self.boredom = min(100, self.boredom + 2)
                 self.energy = max(0, self.energy - 2)
                 self.hygiene = max(0, self.hygiene - 2)
                 if (self.hygiene < 20 or self.hunger > 80) and random.random() < 0.2:
                     self.is_sick = True
+                
+                # Pensamientos inteligentes basados en Clima
+                if clima == "Rain": self.pensamiento = "¡Mejor me quedo adentro!"
+                elif clima == "Clear": self.pensamiento = "¡Qué buen día hace!"
+                elif self.hunger > 70: self.pensamiento = "¡Tengo hambre! [Y]"
+                elif random.random() < 0.2: 
+                    self.pensamiento = random.choice(["Bip Bup...", "¡Me gusta el código!", "Soy Pro", "Guatemala <3"])
             else:
                 self.energy = min(100, self.energy + 10)
                 if self.energy >= 100: self.is_sleeping = False
-            
-            # IA de pensamientos
-            if not self.is_sleeping:
-                if self.is_sick: self.pensamiento = "Me siento mal... [R]"
-                elif self.hunger > 70: self.pensamiento = "¡Tengo mucha hambre! [Y]"
-                elif self.hygiene < 30: self.pensamiento = "Necesito un baño... [B]"
-                elif self.energy < 25: self.pensamiento = "Zzz... qué sueño... [A]"
-                elif random.random() < 0.3:
-                    self.pensamiento = random.choice(["¡Amo programar!", "¡Mira mis circuitos!", "¿Jugamos?", "Bip Bup Bap"])
-            
             self.last_tick = ahora
 
     def mood_expression(self):
@@ -85,7 +135,7 @@ class BBotPet:
         return "neutral"
 
 # ==========================================
-# CLASES DE JUEGOS (Sin cambios para mantener estabilidad)
+# JUEGOS (Naves, Carreras, Pacman)
 # ==========================================
 
 class JuegoNaves:
@@ -176,13 +226,14 @@ class BBotConsola:
             self.joy = pygame.joystick.Joystick(0); self.joy.init()
         
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
-        pygame.display.set_caption("B-Bot Consola Pro")
+        pygame.display.set_caption("B-Bot Consola Pro + Weather")
         pygame.mouse.set_visible(False)
         self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
         self.controles = {}
         
         self.sprite_manager = BBotSpriteManager(SPRITE_SHEET, JSON_CONFIG)
         self.mascota = BBotPet()
+        self.weather = WeatherManager()
         self.chiste_actual = {"setup": "Presiona A...", "punch": ""}
         
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
@@ -220,21 +271,16 @@ class BBotConsola:
             return keys.get(ev.key)
         return None
 
-    def wrap_mejorado(self, texto, fuente, ancho_max):
-        lineas = []; parrafos = texto.split('\n')
-        for p in parrafos:
-            palabras = p.split(' '); l_act = ""
-            for pal in palabras:
-                if fuente.size(l_act + pal)[0] < ancho_max: l_act += pal + " "
-                else: lineas.append(l_act.strip()); l_act = pal + " "
-            lineas.append(l_act.strip())
-        return lineas
-
     def run(self):
         while self.running:
-            fondo = (20, 20, 50) if self.mascota.is_sleeping else CELESTE_CIELO
+            self.weather.actualizar()
+            fondo = (20, 20, 50) if self.mascota.is_sleeping else self.weather.obtener_fondo()
             self.screen.fill(fondo)
-            t = pygame.time.get_ticks(); self.mascota.clock_tick(); accion = None
+            if not self.mascota.is_sleeping: self.weather.dibujar_efectos(self.screen)
+            
+            t = pygame.time.get_ticks()
+            self.mascota.clock_tick(self.weather.clima_actual)
+            accion = None
             
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
@@ -257,17 +303,19 @@ class BBotConsola:
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
 
             if self.modo == "CONFIG":
-                self.mostrar_t("CONFIGURAR MANDO 8BITDO", y=100, color=(0,0,0), size=30)
-                self.mostrar_t(f"PULSA EL BOTÓN PARA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
+                self.mostrar_t("CONFIGURAR MANDO", y=100, color=(0,0,0), size=30)
+                self.mostrar_t(f"PULSA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
 
             elif self.modo == "MENU":
-                # Animación de escala "respiración" + flotación
+                # Info Clima Superior
+                color_txt = (255,255,255) if self.weather.es_noche else (0,0,0)
+                self.mostrar_t(f"{CIUDAD}: {self.weather.temp}°C | {self.weather.clima_actual}", 180, 10, color_txt, 14)
+                
                 latido = 1.0 + math.sin(t * 0.003) * 0.05
                 flot = math.sin(t * 0.005) * 12
                 sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=160 * latido)
                 self.screen.blit(sprite, (ANCHO//2 - sprite.get_width()//2, 100 + flot))
                 
-                # Burbuja de pensamiento
                 if not self.mascota.is_sleeping:
                     pygame.draw.ellipse(self.screen, (255,255,255), (ANCHO//2 + 60, 60, 220, 60))
                     self.mostrar_t(self.mascota.pensamiento, ANCHO//2 + 170, 80, (50,50,50), size=16)
@@ -285,32 +333,25 @@ class BBotConsola:
                     if self.modo == "SUB_CHISTES": self.obtener_nuevo_chiste()
 
             elif self.modo == "SUB_MASCOTA":
-                # B-Bot más grande en su perfil
-                latido = 1.0 + math.sin(t * 0.004) * 0.03
-                sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=200 * latido)
+                sprite = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=200)
                 self.screen.blit(sprite, (ANCHO//2 - sprite.get_width()//2, 20))
-                
-                # Barras mejoradas (Más grandes y con texto de botones)
                 self.dibujar_barra(50, 240, "HAMBRE [Y]", self.mascota.hunger, (200, 50, 50))
                 self.dibujar_barra(50, 310, "HIGIENE [B]", self.mascota.hygiene, (50, 200, 200))
                 self.dibujar_barra(550, 240, "ENERGÍA [A]", self.mascota.energy, (255, 200, 0))
                 self.dibujar_barra(550, 310, "ENTRENA [L]", self.mascota.training, (100, 255, 100))
                 
-                if self.mascota.is_sick: self.mostrar_t("¡ENFERMO! PULSA [R]", 400, 220, (255,0,0), 22)
+                if self.mascota.is_sick: self.mostrar_t("¡ENFERMO! [R]", 400, 220, (255,0,0), 22)
                 
-                # Lógica de botones (Sin cambios, solo mejora visual)
-                if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25); self.mascota.pensamiento = "¡Rico!"
-                elif accion == "X": self.mascota.hunger = max(0, self.mascota.hunger - 10); self.mascota.training += 5
-                elif accion == "B": self.mascota.hygiene = 100; self.mascota.pensamiento = "¡Qué limpio!"
+                if accion == "Y": self.mascota.hunger = max(0, self.mascota.hunger - 25)
+                elif accion == "B": self.mascota.hygiene = 100
                 elif accion == "A": self.mascota.is_sleeping = not self.mascota.is_sleeping
                 elif accion == "L": self.mascota.training = min(100, self.mascota.training + 10)
-                elif accion == "R" and self.mascota.is_sick: self.mascota.is_sick = False; self.mascota.pensamiento = "¡Mejor!"
+                elif accion == "R" and self.mascota.is_sick: self.mascota.is_sick = False
 
             elif self.modo == "EN_JUEGO":
                 if self.juego.actualizar(accion): self.modo = "SUB_JUGAR"
                 else: self.juego.dibujar(self.screen)
             
-            # --- SECCIONES RESTANTES (CHISTES, CUENTOS, JUGAR) ---
             elif self.modo == "SUB_JUGAR":
                 jgs = ["NAVES", "CARROS", "PACMAN"]
                 for i, j in enumerate(jgs):
@@ -329,12 +370,10 @@ class BBotConsola:
                 pygame.draw.rect(self.screen, (255,255,255), (100, 100, 600, 200), border_radius=15)
                 self.mostrar_t(self.chiste_actual["setup"], 400, 140, (0,0,0), 18)
                 self.mostrar_t(self.chiste_actual["punch"], 400, 220, (200,0,0), 22)
-                self.mostrar_t("PULSA [A] PARA OTRO", 400, 270, (100,100,100), 14)
                 if accion == "A": self.obtener_nuevo_chiste()
 
             elif self.modo == "SUB_CUENTOS":
-                archivos = [f for f in os.listdir(self.tales_dir) if f.endswith('.txt')]
-                if not archivos: self.mostrar_t("AÑADE .TXT A LA CARPETA 'TALES'", y=180, color=(0,0,0))
+                archivos = sorted([f for f in os.listdir(self.tales_dir) if f.endswith('.txt')])
                 for i, nombre in enumerate(archivos[:6]):
                     bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
                     pygame.draw.rect(self.screen, bg, (100, 90 + i*45, 600, 40), border_radius=10)
@@ -360,13 +399,9 @@ class BBotConsola:
             pygame.display.flip(); self.clock.tick(60)
 
     def dibujar_barra(self, x, y, nom, val, col):
-        # Barra de fondo más ancha
         pygame.draw.rect(self.screen, (50,50,50), (x, y, 200, 25), border_radius=5)
-        # Relleno
         pygame.draw.rect(self.screen, col, (x+2, y+2, int(val * 1.96), 21), border_radius=5)
-        # Nombre y Porcentaje más grandes
-        txt_display = f"{nom}: {int(val)}%"
-        self.mostrar_t(txt_display, x + 100, y - 25, (0,0,0) if not self.mascota.is_sleeping else (255,255,255), 18)
+        self.mostrar_t(f"{nom}: {int(val)}%", x + 100, y - 25, (0,0,0) if not self.mascota.is_sleeping and not self.weather.es_noche else (255,255,255), 18)
 
     def mostrar_t(self, txt, x=400, y=200, color=(255,255,255), size=22):
         f = pygame.font.SysFont(FUENTE_RETRO, size, True)
