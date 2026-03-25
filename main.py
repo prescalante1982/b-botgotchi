@@ -90,12 +90,12 @@ class BBotPet:
         self.is_sleeping = self.is_sick = False
         self.last_tick = pygame.time.get_ticks()
         self.pensamiento = "¡Hola, Pablo!"
-        self.chistes_esp = [
+self.chistes_esp = [
             {"s": "¿Qué le dice un jaguar a otro?", "p": "¡Jaguar you!"},
             {"s": "¿Por qué el libro de mates está triste?", "p": "Muchos problemas."},
             {"s": "¿Qué hace una abeja en el gym?", "p": "¡Zumba!"},
             {"s": "¿Cómo se dice pañuelo en japonés?", "p": "Saca-moko."},
-            {"s": "¿Cuál es el baile del tomate?", "p": "¡La salsa!"}
+            {"s": "¿Cuál es el baile del tomate?", "p": "¡La salsa!"}, # <--- Faltaba coma aquí
             {"s": "¿Qué le dice un pez a otro?", "p": "¡Nada!"},
             {"s": "¿Qué le dice el 1 al 10?", "p": "Para ser como yo, tienes que ser sincero."},
             {"s": "¿Cuál es el animal que más dientes tiene?", "p": "¡El Ratoncito Pérez!"},
@@ -115,7 +115,7 @@ class BBotPet:
             {"s": "¿Cuál es el postre favorito de los magos?", "p": "¡El flan... tástico!"},
             {"s": "¿Qué hace una vaca con los ojos cerrados?", "p": "¡Leche concentrada!"},
             {"s": "¿Cómo se llama el campeón de buceo japonés?", "p": "Tokofondo."},
-            {"s": "¿Qué le dijo un cable a otro cable?", "p": "¡Somos intocables!"}
+            {"s": "¿Qué le dijo un cable a otro cable?", "p": "¡Somos intocables!"}, # <--- Faltaba coma aquí
             {"s": "¿Qué le dice un pato a otro?", "p": "¡Estamos empatados!"},
             {"s": "¿Cómo se dice 'perro' en chino?", "p": "Chu-moko."},
             {"s": "¿Qué le dice el café a la leche?", "p": "¡Nos vemos en el desayuno!"},
