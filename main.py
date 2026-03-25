@@ -132,7 +132,7 @@ class BBotConsola:
         
         self.seleccion = 0; self.sel_juego = 0; self.juego = None
         
-        # --- Configuración de Cuentos Dinámicos ---
+        # --- Configuración de Cuentos (Carpeta 'tales') ---
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.tales_dir = os.path.join(self.base_path, "tales")
         if not os.path.exists(self.tales_dir):
@@ -142,7 +142,8 @@ class BBotConsola:
         self.idx_cuento = 0
         self.paginas_cuento = []
         self.pagina_actual = 0
-    
+        self.rect_cuento = pygame.Rect(320, 55, 440, 285) # Área de lectura definida
+
     def obtener_accion(self, ev):
         if not self.controles: return None
         for accion, m in self.controles.items():
@@ -166,10 +167,27 @@ class BBotConsola:
             self.lista_cuentos = sorted(archivos) if archivos else ["No hay cuentos.txt"]
 
     def preparar_paginas(self, texto):
-        fuente = pygame.font.SysFont(FUENTE_RETRO, 22)
-        lineas_totales = self.wrap(texto, fuente, 700)
-        lineas_por_pagina = 8 
+        fuente = pygame.font.SysFont(FUENTE_RETRO, 20)
+        # Ancho con padding (440 - 50 de margen)
+        lineas_totales = self.wrap_mejorado(texto, fuente, 390) 
+        lineas_por_pagina = 9 
         return [lineas_totales[i:i + lineas_por_pagina] for i in range(0, len(lineas_totales), lineas_por_pagina)]
+
+    def wrap_mejorado(self, texto, fuente, ancho_max):
+        lineas = []
+        parrafos = texto.split('\n')
+        for p in parrafos:
+            palabras = p.split(' ')
+            linea_act = ""
+            for pal in palabras:
+                test_linea = linea_act + pal + " "
+                if fuente.size(test_linea)[0] < ancho_max:
+                    linea_act = test_linea
+                else:
+                    lineas.append(linea_act.strip())
+                    linea_act = pal + " "
+            lineas.append(linea_act.strip())
+        return lineas
 
     def leer_cuento(self, nombre_archivo):
         ruta = os.path.join(self.tales_dir, nombre_archivo)
@@ -262,16 +280,29 @@ class BBotConsola:
                     self.modo = "LEYENDO_CUENTO"
 
             elif self.modo == "LEYENDO_CUENTO":
-                self.screen.fill((255, 255, 245))
+                self.screen.fill(CELESTE_CIELO)
+                
+                # B-Bot a la izquierda
+                self.dibujar_bot(t, x=160, size_mult=1.2)
+                
+                # Cuadro de texto estilo papel
+                pygame.draw.rect(self.screen, (255, 255, 245), self.rect_cuento, border_radius=15)
+                pygame.draw.rect(self.screen, (0, 0, 0), self.rect_cuento, 3, border_radius=15)
+                
                 titulo = self.lista_cuentos[self.idx_cuento].replace(".txt", "").upper()
-                self.mostrar_t(titulo, y=20, color=(100, 100, 100), size=16)
-                f_c = pygame.font.SysFont(FUENTE_RETRO, 22)
+                self.mostrar_t(titulo, x=540, y=20, color=(0, 0, 0), size=18)
+
+                f_c = pygame.font.SysFont(FUENTE_RETRO, 20)
                 if self.paginas_cuento:
+                    margin_x = self.rect_cuento.x + 25
+                    margin_y = self.rect_cuento.y + 30
+                    
                     for i, linea in enumerate(self.paginas_cuento[self.pagina_actual]):
                         txt_surf = f_c.render(linea, True, (30, 30, 30))
-                        self.screen.blit(txt_surf, (50, 70 + i*35))
-                    info_pag = f"Página {self.pagina_actual + 1} de {len(self.paginas_cuento)}"
-                    self.mostrar_t(info_pag, y=360, color=(150, 150, 150), size=14)
+                        self.screen.blit(txt_surf, (margin_x, margin_y + i * 28))
+                    
+                    info_pag = f"{self.pagina_actual + 1} / {len(self.paginas_cuento)}"
+                    self.mostrar_t(info_pag, x=540, y=320, color=(100, 100, 100), size=14)
                 
                 if accion == "DERECHA" or accion == "A":
                     if self.pagina_actual < len(self.paginas_cuento) - 1:
@@ -307,13 +338,6 @@ class BBotConsola:
         pygame.draw.circle(self.screen, (0,0,0), (x-20*size_mult, 135*size_mult+f), 8*size_mult)
         pygame.draw.circle(self.screen, (0,0,0), (x+20*size_mult, 135*size_mult+f), 8*size_mult)
         pygame.draw.rect(self.screen, (0,0,0), (x-15*size_mult, 155*size_mult+f, 30*size_mult, 4*size_mult))
-
-    def wrap(self, texto, fuente, ancho_max):
-        pals = texto.split(' '); lins = []; l_act = ""
-        for p in pals:
-            if fuente.size(l_act + p)[0] < ancho_max: l_act += p + " "
-            else: lins.append(l_act); l_act = p + " "
-        lins.append(l_act); return lins
 
 if __name__ == "__main__":
     BBotConsola().run()
