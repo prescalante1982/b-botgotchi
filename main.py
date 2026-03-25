@@ -301,8 +301,12 @@ class BBotConsola:
                         txt_surf = f_c.render(linea, True, (30, 30, 30))
                         self.screen.blit(txt_surf, (margin_x, margin_y + i * 28))
                     
+                    # --- CORRECCIÓN AQUÍ ---
+                    # Bajamos la 'y' a 350 para que no pise el cuadro (que llega a 340)
+                    # Subimos el tamaño a 16 para que se lea mejor abajo
                     info_pag = f"{self.pagina_actual + 1} / {len(self.paginas_cuento)}"
-                    self.mostrar_t(info_pag, x=540, y=320, color=(100, 100, 100), size=14)
+                    self.mostrar_t(info_pag, x=540, y=350, color=(80, 80, 80), size=16)
+                    # ----------------------
                 
                 if accion == "DERECHA" or accion == "A":
                     if self.pagina_actual < len(self.paginas_cuento) - 1:
