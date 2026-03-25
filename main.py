@@ -41,7 +41,8 @@ class WeatherManager:
                 hora = time.localtime().tm_hour
                 self.es_noche = hora < 6 or hora > 18
                 self.ultimo_check = pygame.time.get_ticks()
-        except: pass
+        except: 
+            pass
         self.actualizando = False
 
     def actualizar(self):
@@ -90,12 +91,14 @@ class BBotPet:
         self.is_sleeping = self.is_sick = False
         self.last_tick = pygame.time.get_ticks()
         self.pensamiento = "¡Hola, Pablo!"
-self.chistes_esp = [
+        
+        # --- LISTA DE CHISTES (IDENTACIÓN CORREGIDA) ---
+        self.chistes_esp = [
             {"s": "¿Qué le dice un jaguar a otro?", "p": "¡Jaguar you!"},
             {"s": "¿Por qué el libro de mates está triste?", "p": "Muchos problemas."},
             {"s": "¿Qué hace una abeja en el gym?", "p": "¡Zumba!"},
             {"s": "¿Cómo se dice pañuelo en japonés?", "p": "Saca-moko."},
-            {"s": "¿Cuál es el baile del tomate?", "p": "¡La salsa!"}, # <--- Faltaba coma aquí
+            {"s": "¿Cuál es el baile del tomate?", "p": "¡La salsa!"},
             {"s": "¿Qué le dice un pez a otro?", "p": "¡Nada!"},
             {"s": "¿Qué le dice el 1 al 10?", "p": "Para ser como yo, tienes que ser sincero."},
             {"s": "¿Cuál es el animal que más dientes tiene?", "p": "¡El Ratoncito Pérez!"},
@@ -115,7 +118,7 @@ self.chistes_esp = [
             {"s": "¿Cuál es el postre favorito de los magos?", "p": "¡El flan... tástico!"},
             {"s": "¿Qué hace una vaca con los ojos cerrados?", "p": "¡Leche concentrada!"},
             {"s": "¿Cómo se llama el campeón de buceo japonés?", "p": "Tokofondo."},
-            {"s": "¿Qué le dijo un cable a otro cable?", "p": "¡Somos intocables!"}, # <--- Faltaba coma aquí
+            {"s": "¿Qué le dijo un cable a otro cable?", "p": "¡Somos intocables!"},
             {"s": "¿Qué le dice un pato a otro?", "p": "¡Estamos empatados!"},
             {"s": "¿Cómo se dice 'perro' en chino?", "p": "Chu-moko."},
             {"s": "¿Qué le dice el café a la leche?", "p": "¡Nos vemos en el desayuno!"},
@@ -219,24 +222,17 @@ class JuegoCarreras:
     
     def actualizar(self, accion):
         if self.timer_msg > 0: self.timer_msg -= 1; return False
-        
-        # Aumentamos impacto de aceleración y freno
         if accion == "A": self.v = min(22, self.v + 1.2)
         elif accion == "B": self.v = max(3, self.v - 1.5)
-        else: self.v = max(5, self.v - 0.2) # Resistencia al aire
-        
-        # Giro más rápido (Pablo Pro)
+        else: self.v = max(5, self.v - 0.2)
         if accion == "IZQUIERDA": self.x = max(220, self.x - 18)
         elif accion == "DERECHA": self.x = min(580, self.x + 18)
-        
         self.distancia += self.v / 5
         if self.distancia >= self.meta: self.mensaje = "¡META ALCANZADA!"; self.timer_msg = 120; return True
-
         if random.random() < 0.06:
             nx = random.randint(220, 580)
             if all(abs(o[1] - (-100)) > 220 for o in self.obs):
                 self.obs.append([nx, -100, random.choice([(220,20,20), (20,20,220), (220,220,20)])])
-        
         for o in self.obs[:]:
             o[1] += self.v + 2
             if 310 < o[1] < 385 and abs(self.x - o[0]) < 40:
@@ -244,25 +240,21 @@ class JuegoCarreras:
                 if self.vidas > 0: self.mensaje = f"VIDAS: {self.vidas}"; self.timer_msg = 60
                 else: self.mensaje = "¡GAME OVER!"; self.timer_msg = 120; return True
             if o[1] > 450: self.obs.remove(o); self.puntos += 10
-        
         if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "+1 VIDA"; self.timer_msg = 45
         return False
 
     def dibujar(self, sc):
-        sc.fill((40, 180, 40)) # Grama limpia
-        pygame.draw.rect(sc, (80, 80, 80), (200, 0, 400, 400)) # Asfalto
+        sc.fill((40, 180, 40))
+        pygame.draw.rect(sc, (80, 80, 80), (200, 0, 400, 400))
         offset = (pygame.time.get_ticks() * (self.v/5) // 10) % 100
         for i in range(-100, 500, 100): pygame.draw.rect(sc, (255,255,255), (396, i + offset, 8, 50))
-        # Jugador
         pygame.draw.rect(sc, (30,30,30), (self.x-23, 318, 46, 45), border_radius=4)
         pygame.draw.rect(sc, (50, 120, 255), (self.x-20, 310, 40, 60), border_radius=10)
         pygame.draw.rect(sc, (180,230,255), (self.x-15, 320, 30, 15), border_radius=4)
-        # Otros carros
         for o in self.obs:
             pygame.draw.rect(sc, (30,30,30), (o[0]-23, o[1]+8, 46, 45), border_radius=4)
             pygame.draw.rect(sc, o[2], (o[0]-20, o[1], 40, 60), border_radius=10)
             pygame.draw.rect(sc, (180,230,255), (o[0]-15, o[1]+10, 30, 15), border_radius=4)
-        
         fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(fuente.render(f"META: {int(self.distancia)}/{self.meta}m | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
         if self.timer_msg > 0:
@@ -291,11 +283,9 @@ class JuegoPacman:
         elif accion == "ARRIBA": nx -= 1
         elif accion == "ABAJO": nx += 1
         if 0 <= nx < 7 and 0 <= ny < 15 and self.mapa[nx][ny] == 0: self.px, self.py = nx, ny
-        
         if [self.px, self.py] in self.pts:
             self.pts.remove([self.px, self.py]); self.puntos += 10
             if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "+1 VIDA"; self.timer_msg = 45
-        
         for f in self.fantasmas:
             if pygame.time.get_ticks() % 12 == 0:
                 if f[0] < self.px: f[0] += 1
@@ -314,18 +304,15 @@ class JuegoPacman:
             for c in range(15):
                 if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0, 0, 200), (c*50+15, r*50+15, 20, 20), border_radius=5)
                 elif [r,c] in self.pts: pygame.draw.circle(sc, (255,220,150), (c*50+25, r*50+25), 4)
-        # Pacman
         boca = abs(math.sin(pygame.time.get_ticks()*0.015)) * 25
         pygame.draw.circle(sc, (255,255,0), (self.py*50+25, self.px*50+25), 18)
-        # Fantasmas con ojos
         for f in self.fantasmas:
             fx, fy = f[1]*50+25, f[0]*50+25
             pygame.draw.rect(sc, (255, 0, 100), (fx-15, fy-15, 30, 30), border_top_left_radius=15, border_top_right_radius=15)
-            pygame.draw.circle(sc, (255,255,255), (fx-6, fy-5), 5) # Ojo Blanco
+            pygame.draw.circle(sc, (255,255,255), (fx-6, fy-5), 5)
             pygame.draw.circle(sc, (255,255,255), (fx+6, fy-5), 5)
-            pygame.draw.circle(sc, (0,0,0), (fx-6, fy-5), 2) # Pupila
+            pygame.draw.circle(sc, (0,0,0), (fx-6, fy-5), 2)
             pygame.draw.circle(sc, (0,0,0), (fx+6, fy-5), 2)
-
         fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(fuente.render(f"SCORE: {self.puntos} | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
         if self.timer_msg > 0:
@@ -417,7 +404,6 @@ class BBotConsola:
             keys_raw = pygame.key.get_pressed()
             if keys_raw[pygame.K_c]: self.modo = "CONFIG"; self.idx_cfg = 0; self.controles = {}
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
-            
             if self.modo == "CONFIG":
                 self.mostrar_t("MUEVE O PULSA EL MANDO", y=100, color=(0,0,0), size=30)
                 self.mostrar_t(f"BOTÓN PARA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
