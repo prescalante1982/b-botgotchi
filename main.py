@@ -16,12 +16,11 @@ SPRITE_SHEET = "bbot_sprite_sheet.PNG"
 JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
-# CONFIGURACIÓN CLIMA
 API_KEY_WEATHER = "2f9b383d006c73b7d2d11226c5fdd10d"
 CIUDAD = "Guatemala City"
 
 # ==========================================
-# GESTORES DE ENTORNO (CLIMA ASÍNCRONO)
+# GESTORES DE ENTORNO
 # ==========================================
 
 class WeatherManager:
@@ -122,35 +121,42 @@ class BBotPet:
         return "neutral"
 
 # ==========================================
-# JUEGOS MEJORADOS (PABLO EDITION)
+# JUEGOS REFORMADOS (PABLO PRO EDITION)
 # ==========================================
 
 class JuegoNaves:
     def __init__(self):
         self.x = 400; self.balas = []; self.enemigos = []; self.puntos = 0; self.vidas = 3
+        self.mensaje = ""; self.timer_msg = 0; self.next_extra = 100
         self.estrellas = [[random.randint(0, 800), random.randint(0, 400), random.random()] for _ in range(60)]
     
     def actualizar(self, accion):
-        if accion == "IZQUIERDA": self.x = max(30, self.x - 45)
-        elif accion == "DERECHA": self.x = min(770, self.x + 45)
+        if self.timer_msg > 0: self.timer_msg -= 1; return False
+        
+        if accion == "IZQUIERDA": self.x = max(30, self.x - 12)
+        elif accion == "DERECHA": self.x = min(770, self.x + 12)
         elif accion == "X" or accion == "A": self.balas.append([self.x, 340])
         
         if random.random() < 0.08: self.enemigos.append([random.randint(50,750), -40])
         
         for b in self.balas[:]:
-            b[1] -= 20
+            b[1] -= 15
             if b[1] < 0: self.balas.remove(b)
         
         for e in self.enemigos[:]:
-            e[1] += (6 + self.puntos//200)
+            e[1] += (4 + self.puntos//200)
             if e[1] > 330 and abs(e[0]-self.x) < 40:
-                self.vidas -= 1; self.enemigos = []; return self.vidas <= 0
+                self.vidas -= 1; self.enemigos = []
+                if self.vidas > 0: self.mensaje = f"¡CUIDADO! TE QUEDAN {self.vidas} VIDAS"; self.timer_msg = 60
+                else: self.mensaje = "¡GAME OVER!"; self.timer_msg = 120; return True
             for b in self.balas[:]:
-                if abs(e[0]-b[0])<35 and abs(e[1]-b[1])<35:
+                if abs(e[0]-b[0])<40 and abs(e[1]-b[1])<30:
                     if e in self.enemigos: self.enemigos.remove(e)
                     if b in self.balas: self.balas.remove(b)
                     self.puntos += 10; break
             if e[1] > 400: self.enemigos.remove(e)
+        
+        if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "¡VIDA EXTRA!"; self.timer_msg = 45
         return False
 
     def dibujar(self, sc):
@@ -159,62 +165,77 @@ class JuegoNaves:
             s[0] = (s[0] - s[2]*2) % 800
             pygame.draw.circle(sc, (255,255,255), (int(s[0]), s[1]), 1)
         
-        color_nave = (0, 255, 100)
-        pygame.draw.rect(sc, color_nave, (self.x-25, 360, 50, 10)) 
-        pygame.draw.rect(sc, color_nave, (self.x-25, 345, 10, 15)) 
-        pygame.draw.rect(sc, color_nave, (self.x+15, 345, 10, 15)) 
-        pygame.draw.rect(sc, color_nave, (self.x-5, 345, 10, 15))  
+        # Jugador (E acostada)
+        pygame.draw.rect(sc, (0, 255, 150), (self.x-25, 360, 50, 10), border_radius=3)
+        pygame.draw.rect(sc, (0, 255, 150), (self.x-5, 345, 10, 15))
         
-        for e in self.enemigos: pygame.draw.polygon(sc, (255, 50, 50), [(e[0], e[1]+20), (e[0]-20, e[1]-10), (e[0]+20, e[1]-10)])
+        # Enemigos (UFOS)
+        for e in self.enemigos:
+            pygame.draw.ellipse(sc, (150, 150, 150), (e[0]-25, e[1], 50, 20)) # Base
+            pygame.draw.circle(sc, (0, 200, 255), (e[0], e[1]), 12) # Cúpula
+            for i in range(-2, 3): pygame.draw.circle(sc, (255, 255, 0), (e[0]+i*10, e[1]+12), 3) # Luces
+            
         for b in self.balas: pygame.draw.rect(sc, (255,255,0), (b[0]-2, b[1], 4, 12))
         
-        fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
-        sc.blit(fuente.render(f"PUNTOS: {self.puntos}", True, (255,255,255)), (10, 10))
-        sc.blit(fuente.render(f"VIDAS: {self.vidas}", True, (255,50,50)), (10, 35))
+        fuente = pygame.font.SysFont(FUENTE_RETRO, 22, True)
+        sc.blit(fuente.render(f"PUNTOS: {self.puntos}  VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
+        if self.timer_msg > 0:
+            txt = fuente.render(self.mensaje, True, (255, 255, 0))
+            sc.blit(txt, (400 - txt.get_width()//2, 200))
 
 class JuegoCarreras:
     def __init__(self):
         self.x = 400; self.obs = []; self.v = 5; self.vidas = 3; self.puntos = 0; self.distancia = 0
+        self.mensaje = ""; self.timer_msg = 0; self.next_extra = 100
     
     def actualizar(self, accion):
-        if accion == "A": self.v = min(15, self.v + 0.2)
-        elif accion == "B": self.v = max(2, self.v - 0.3)
-        if accion == "IZQUIERDA": self.x = max(220, self.x - 8)
-        elif accion == "DERECHA": self.x = min(580, self.x + 8)
-        self.distancia += self.v / 10
-        if random.random() < 0.05:
-            nuevo_x = random.randint(220, 580)
-            safe = True
-            for o in self.obs:
-                if abs(o[1] - (-100)) < 150: safe = False
-            if safe: self.obs.append([nuevo_x, -100, random.choice([(255,0,0), (0,0,255), (255,255,0)])])
+        if self.timer_msg > 0: self.timer_msg -= 1; return False
+        
+        if accion == "A": self.v = min(18, self.v + 0.4)
+        elif accion == "B": self.v = max(3, self.v - 0.5)
+        else: self.v = max(5, self.v - 0.1) # Deceleración natural
+            
+        if accion == "IZQUIERDA": self.x = max(220, self.x - 10)
+        elif accion == "DERECHA": self.x = min(580, self.x + 10)
+        
+        self.distancia += self.v / 5
+        
+        if random.random() < 0.06:
+            nx = random.randint(220, 580)
+            if all(abs(o[1] - (-100)) > 180 for o in self.obs):
+                self.obs.append([nx, -100, random.choice([(220,20,20), (20,20,220), (220,220,20)])])
+
         for o in self.obs[:]:
-            o[1] += self.v + 2
-            if 310 < o[1] < 380 and abs(self.x - o[0]) < 40:
+            o[1] += self.v + 1
+            if 310 < o[1] < 385 and abs(self.x - o[0]) < 40:
                 self.vidas -= 1; self.obs = []; self.v = 5
-                return self.vidas <= 0
+                if self.vidas > 0: self.mensaje = f"¡CHOCASTE! QUEDAN {self.vidas}"; self.timer_msg = 60
+                else: self.mensaje = "¡GAME OVER!"; self.timer_msg = 120; return True
             if o[1] > 450: self.obs.remove(o); self.puntos += 10
+            
+        if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "¡MÁS VELOCIDAD, MÁS VIDAS!"; self.timer_msg = 45
         return False
 
     def dibujar(self, sc):
-        sc.fill((0, 180, 0)) 
-        pygame.draw.rect(sc, (180, 180, 180), (200, 0, 400, 400)) 
-        offset = (pygame.time.get_ticks() // 20) % 100
-        for i in range(-100, 500, 100):
-            pygame.draw.rect(sc, (255,255,255), (395, i + offset, 10, 50))
+        sc.fill((20, 160, 20)) # Grama
+        pygame.draw.rect(sc, (140, 140, 140), (200, 0, 400, 400)) # Asfalto claro
+        offset = (pygame.time.get_ticks() * (self.v/5) // 10) % 100
+        for i in range(-100, 500, 100): pygame.draw.rect(sc, (255,255,255), (396, i + offset, 8, 50))
         
         def draw_car(surface, x, y, color):
-            pygame.draw.rect(surface, (0,0,0), (x-22, y+5, 44, 50), border_radius=5) 
-            pygame.draw.rect(surface, color, (x-20, y, 40, 60), border_radius=8) 
-            pygame.draw.rect(surface, (200,255,255), (x-15, y+10, 30, 15), border_radius=3) 
-            pygame.draw.rect(surface, (50,50,50), (x-22, y+45, 8, 12)) 
-            pygame.draw.rect(surface, (50,50,50), (x+14, y+45, 8, 12)) 
+            pygame.draw.rect(surface, (30,30,30), (x-23, y+8, 46, 45), border_radius=4) # Llantas
+            pygame.draw.rect(surface, color, (x-20, y, 40, 60), border_radius=10) # Carro
+            pygame.draw.rect(surface, (180,230,255), (x-15, y+10, 30, 15), border_radius=4) # Parabrisas
+            pygame.draw.rect(surface, (255,255,100), (x-15, y+52, 8, 4)) # Luces
 
-        draw_car(sc, self.x, 320, (50, 100, 255)) 
+        draw_car(sc, self.x, 310, (50, 120, 255)) 
         for o in self.obs: draw_car(sc, o[0], o[1], o[2]) 
-        fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
-        sc.blit(fuente.render(f"DISTANCIA: {int(self.distancia)}m", True, (0,0,0)), (10, 10))
-        sc.blit(fuente.render(f"VIDAS: {self.vidas}", True, (200,0,0)), (10, 35))
+        
+        fuente = pygame.font.SysFont(FUENTE_RETRO, 22, True)
+        sc.blit(fuente.render(f"KM: {int(self.distancia/10)}  VIDAS: {self.vidas}", True, (0,0,0)), (10, 10))
+        if self.timer_msg > 0:
+            txt = fuente.render(self.mensaje, True, (200, 0, 0))
+            sc.blit(txt, (400 - txt.get_width()//2, 200))
 
 class JuegoPacman:
     def __init__(self):
@@ -225,47 +246,57 @@ class JuegoPacman:
                     [1,0,1,0,1,1,1,1,1,1,0,1,1,0,1],
                     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
                     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]]
-        self.px, self.py = 1, 1
+        self.px, self.py = 1, 1; self.vidas = 3; self.puntos = 0; self.next_extra = 100
         self.pts = [[r, c] for r in range(7) for c in range(15) if self.mapa[r][c] == 0]
-        self.vidas = 3; self.puntos = 0
-        self.fantasma = [5, 13]
+        self.fantasma = [5, 13]; self.timer_msg = 0; self.mensaje = ""
 
     def actualizar(self, accion):
+        if self.timer_msg > 0: self.timer_msg -= 1; return False
+        
         nx, ny = self.px, self.py
         if accion == "IZQUIERDA": ny -= 1
         elif accion == "DERECHA": ny += 1
         elif accion == "ARRIBA": nx -= 1
         elif accion == "ABAJO": nx += 1
-        if 0 <= nx < 7 and 0 <= ny < 15 and self.mapa[nx][ny] == 0:
-            self.px, self.py = nx, ny
+        
+        if 0 <= nx < 7 and 0 <= ny < 15 and self.mapa[nx][ny] == 0: self.px, self.py = nx, ny
+        
         if [self.px, self.py] in self.pts:
-            self.pts.remove([self.px, self.py])
-            self.puntos += 10
-        if pygame.time.get_ticks() % 15 == 0:
+            self.pts.remove([self.px, self.py]); self.puntos += 10
+            if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "¡EXTRA VIDA!"; self.timer_msg = 45
+        
+        if pygame.time.get_ticks() % 10 == 0: # Fantasma más fluido
             if self.fantasma[0] < self.px: self.fantasma[0] += 1
             elif self.fantasma[0] > self.px: self.fantasma[0] -= 1
-            if self.fantasma[1] < self.py: self.fantasma[1] += 1
+            elif self.fantasma[1] < self.py: self.fantasma[1] += 1
             elif self.fantasma[1] > self.py: self.fantasma[1] -= 1
+            
         if self.fantasma == [self.px, self.py]:
             self.vidas -= 1; self.px, self.py = 1, 1
-            return self.vidas <= 0
+            if self.vidas > 0: self.mensaje = f"¡TE ATRAPARON! QUEDAN {self.vidas}"; self.timer_msg = 60
+            else: self.mensaje = "GAME OVER"; self.timer_msg = 120; return True
         return len(self.pts) == 0
 
     def dibujar(self, sc):
-        sc.fill((0,0,20))
+        sc.fill((0,0,30))
         for r in range(7):
             for c in range(15):
-                x, y = c*50 + 25, r*50 + 25
-                if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0, 0, 150), (x+15, y+15, 20, 20), border_radius=4)
-                elif [r,c] in self.pts: pygame.draw.circle(sc, (255,255,200), (x+25, y+25), 4)
-        boca = abs(math.sin(pygame.time.get_ticks()*0.01)) * 30
-        pygame.draw.circle(sc, (255,255,0), (self.py*50 + 50, self.px*50 + 50), 20)
-        pygame.draw.polygon(sc, (0,0,20), [(self.py*50+50, self.px*50+50), (self.py*50+75, self.px*50+50-boca), (self.py*50+75, self.px*50+50+boca)])
-        fx, fy = self.fantasma[1]*50 + 50, self.fantasma[0]*50 + 50
-        pygame.draw.rect(sc, (255, 50, 200), (fx-15, fy-15, 30, 30), border_top_left_radius=15, border_top_right_radius=15)
+                if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0, 0, 180), (c*50+18, r*50+18, 14, 14), border_radius=2)
+                elif [r,c] in self.pts: pygame.draw.circle(sc, (255,220,150), (c*50+25, r*50+25), 4)
+        
+        boca = abs(math.sin(pygame.time.get_ticks()*0.015)) * 25
+        pygame.draw.circle(sc, (255,255,0), (self.py*50+25, self.px*50+25), 18)
+        pygame.draw.polygon(sc, (0,0,30), [(self.py*50+25, self.px*50+25), (self.py*50+45, self.px*50+25-boca), (self.py*50+45, self.px*50+25+boca)])
+        
+        fx, fy = self.fantasma[1]*50+25, self.fantasma[0]*50+25
+        pygame.draw.rect(sc, (255, 0, 100), (fx-15, fy-15, 30, 30), border_top_left_radius=15, border_top_right_radius=15)
         pygame.draw.circle(sc, (255,255,255), (fx-6, fy-5), 4); pygame.draw.circle(sc, (255,255,255), (fx+6, fy-5), 4)
-        fuente = pygame.font.SysFont(FUENTE_RETRO, 18, True)
-        sc.blit(fuente.render(f"PUNTOS: {self.puntos}  VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
+        
+        fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
+        sc.blit(fuente.render(f"SCORE: {self.puntos}  VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
+        if self.timer_msg > 0:
+            txt = fuente.render(self.mensaje, True, (255, 255, 0))
+            sc.blit(txt, (400 - txt.get_width()//2, 180))
 
 # ==========================================
 # CONSOLA PRINCIPAL
@@ -274,10 +305,6 @@ class JuegoPacman:
 class BBotConsola:
     def __init__(self):
         pygame.init(); pygame.joystick.init()
-        self.joy = None
-        if pygame.joystick.get_count() > 0:
-            self.joy = pygame.joystick.Joystick(0); self.joy.init()
-        
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
         pygame.display.set_caption("B-Bot Pro: Pablo Edition")
         pygame.mouse.set_visible(False)
@@ -290,8 +317,7 @@ class BBotConsola:
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
         self.idx_cfg = 0
 
-        if not os.path.exists(CONFIG_FILE) or os.path.getsize(CONFIG_FILE) == 0:
-            self.modo = "CONFIG"
+        if not os.path.exists(CONFIG_FILE) or os.path.getsize(CONFIG_FILE) == 0: self.modo = "CONFIG"
         else:
             try:
                 with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
@@ -346,10 +372,8 @@ class BBotConsola:
                             self.modo = "MENU"
                 else: accion = self.obtener_accion(ev)
 
-            # --- TECLA C PARA RE-CONFIGURAR ---
             keys_raw = pygame.key.get_pressed()
             if keys_raw[pygame.K_c]: self.modo = "CONFIG"; self.idx_cfg = 0; self.controles = {}
-
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
 
             if self.modo == "CONFIG":
