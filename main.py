@@ -6,6 +6,7 @@ import math
 import random
 import requests
 import threading
+import subprocess
 
 # --- CONFIGURACIÓN ---
 ANCHO, ALTO = 800, 400
@@ -13,6 +14,10 @@ CONFIG_FILE = "config_pablo.json"
 SPRITE_SHEET = "bbot_sprite_sheet.PNG" 
 JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
+
+# RUTAS RETROPIE (Ajusta si tus ROMS están en otra carpeta)
+ARCADE_ROMS_PATH = "/home/pi/RetroPie/roms/mame-libretro/"
+ARCADE_COMMAND = "/usr/bin/retroarch" # O usa el lanzador de RetroPie
 
 API_KEY_WEATHER = "2f9b383d006c73b7d2d11226c5fdd10d"
 CIUDAD = "Guatemala City"
@@ -41,8 +46,7 @@ class WeatherManager:
                 hora = time.localtime().tm_hour
                 self.es_noche = hora < 6 or hora > 18
                 self.ultimo_check = pygame.time.get_ticks()
-        except: 
-            pass
+        except: pass
         self.actualizando = False
 
     def actualizar(self):
@@ -92,7 +96,6 @@ class BBotPet:
         self.last_tick = pygame.time.get_ticks()
         self.pensamiento = "¡Hola, Pablo!"
         
-        # --- LISTA DE CHISTES (IDENTACIÓN CORREGIDA) ---
         self.chistes_esp = [
             {"s": "¿Qué le dice un jaguar a otro?", "p": "¡Jaguar you!"},
             {"s": "¿Por qué el libro de mates está triste?", "p": "Muchos problemas."},
@@ -162,7 +165,7 @@ class BBotPet:
         return "neutral"
 
 # ==========================================
-# JUEGOS MEJORADOS
+# JUEGOS INTERNOS
 # ==========================================
 
 class JuegoNaves:
@@ -176,12 +179,10 @@ class JuegoNaves:
         if accion == "IZQUIERDA": self.x = max(30, self.x - 20)
         elif accion == "DERECHA": self.x = min(770, self.x + 20)
         elif accion == "X" or accion == "A": self.balas.append([self.x, 340])
-        
         if random.random() < 0.08: self.enemigos.append([random.randint(50,750), -40])
         for b in self.balas[:]:
             b[1] -= 15
             if b[1] < 0: self.balas.remove(b)
-        
         for e in self.enemigos[:]:
             e[1] += (5 + self.puntos//200)
             if e[1] > 330 and abs(e[0]-self.x) < 40:
@@ -194,7 +195,6 @@ class JuegoNaves:
                     if b in self.balas: self.balas.remove(b)
                     self.puntos += 10; break
             if e[1] > 400: self.enemigos.remove(e)
-        
         if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "¡VIDA EXTRA!"; self.timer_msg = 45
         return False
 
@@ -320,7 +320,7 @@ class JuegoPacman:
             sc.blit(txt, (400 - txt.get_width()//2, 180))
 
 # ==========================================
-# CONSOLA PRINCIPAL
+# CONSOLA PRINCIPAL (B-BOT PRO)
 # ==========================================
 
 class BBotConsola:
@@ -329,6 +329,7 @@ class BBotConsola:
         self.joy = None
         if pygame.joystick.get_count() > 0:
             self.joy = pygame.joystick.Joystick(0); self.joy.init()
+        
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
         pygame.display.set_caption("B-Bot Pro: Pablo Edition")
         pygame.mouse.set_visible(False)
@@ -337,18 +338,27 @@ class BBotConsola:
         self.sprite_manager = BBotSpriteManager(SPRITE_SHEET, JSON_CONFIG)
         self.mascota = BBotPet(); self.weather = WeatherManager()
         self.chiste_actual = {"setup": "Cargando...", "punch": ""}
+        
+        # Animación de menú
+        self.target_seleccion = 0
+        self.current_seleccion = 0
+        
         self.pasos_cfg = ["IZQUIERDA", "DERECHA", "ARRIBA", "ABAJO", "A", "B", "X", "Y", "L", "R", "SELECT", "START"]
         self.idx_cfg = 0
+        
         if not os.path.exists(CONFIG_FILE) or os.path.getsize(CONFIG_FILE) == 0: self.modo = "CONFIG"
         else:
             try:
                 with open(CONFIG_FILE, 'r') as f: self.controles = json.load(f)
             except: self.modo = "CONFIG"
+
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.tales_dir = os.path.join(self.base_path, "tales")
         if not os.path.exists(self.tales_dir): os.makedirs(self.tales_dir)
+        
         self.rect_cuento = pygame.Rect(320, 55, 440, 285)
-        self.seleccion = 0; self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0; self.paginas_cuento = []
+        self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0; self.paginas_cuento = []
+        self.arcade_roms = []
 
     def obtener_nuevo_chiste(self):
         ch = random.choice(self.mascota.chistes_esp)
@@ -363,6 +373,28 @@ class BBotConsola:
                 else: lineas.append(l_act.strip()); l_act = pal + " "
             lineas.append(l_act.strip())
         return lineas
+
+    def obtener_arcade_roms(self):
+        try:
+            if os.path.exists(ARCADE_ROMS_PATH):
+                return sorted([f for f in os.listdir(ARCADE_ROMS_PATH) if f.endswith(('.zip', '.nes', '.gb', '.gba'))])
+            return []
+        except: return []
+
+    def lanzar_arcade(self, rom_name):
+        rom_full_path = os.path.join(ARCADE_ROMS_PATH, rom_name)
+        pygame.display.quit() # Cerramos B-Bot para dar prioridad a RetroArch
+        # Lanzamos via RetroPie runcommand (esto asegura que use el emulador correcto configurado)
+        try:
+            # Comando estándar de lanzador de RetroPie
+            subprocess.run(["sudo", "bash", "/home/pi/RetroPie-Setup/retropie_packages/retroarch/bin/retroarch", "-L", "/opt/retropie/libretrocores/lr-mame2003/mame2003_libretro.so", rom_full_path])
+        except:
+            pass
+        # Al volver, reiniciamos todo
+        pygame.init()
+        self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
+        pygame.mouse.set_visible(False)
+        self.modo = "MENU"
 
     def obtener_accion(self, ev):
         if not self.controles: return None
@@ -384,8 +416,11 @@ class BBotConsola:
             fondo = (20, 20, 50) if self.mascota.is_sleeping else self.weather.obtener_fondo()
             self.screen.fill(fondo)
             if not self.mascota.is_sleeping: self.weather.dibujar_efectos(self.screen)
-            t = pygame.time.get_ticks(); self.mascota.clock_tick(self.weather.clima_actual)
+            
+            t = pygame.time.get_ticks()
+            self.mascota.clock_tick(self.weather.clima_actual)
             accion = None
+            
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT: self.running = False
                 if self.modo == "CONFIG":
@@ -401,32 +436,64 @@ class BBotConsola:
                             with open(CONFIG_FILE, 'w') as f: json.dump(self.controles, f)
                             self.modo = "MENU"
                 else: accion = self.obtener_accion(ev)
+
             keys_raw = pygame.key.get_pressed()
             if keys_raw[pygame.K_c]: self.modo = "CONFIG"; self.idx_cfg = 0; self.controles = {}
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
+
             if self.modo == "CONFIG":
                 self.mostrar_t("MUEVE O PULSA EL MANDO", y=100, color=(0,0,0), size=30)
                 self.mostrar_t(f"BOTÓN PARA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
+
             elif self.modo == "MENU":
+                # --- MENÚ INTERACTIVO PRO ---
                 col_t = (255,255,255) if self.weather.es_noche else (0,0,0)
                 self.mostrar_t(f"{CIUDAD}: {self.weather.temp}°C | {self.weather.clima_actual}", 180, 10, col_t, 14)
+                
+                # Mascota con animación suave
                 lat = 1.0 + math.sin(t * 0.003) * 0.05
                 flo = math.sin(t * 0.005) * 12
                 spr = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=160 * lat)
-                self.screen.blit(spr, (ANCHO//2 - spr.get_width()//2, 100 + flo))
+                self.screen.blit(spr, (ANCHO//2 - spr.get_width()//2, 80 + flo))
+                
+                # Burbuja de pensamiento
                 if not self.mascota.is_sleeping:
-                    pygame.draw.ellipse(self.screen, (255,255,255), (ANCHO//2 + 60, 60, 220, 60))
-                    self.mostrar_t(self.mascota.pensamiento, ANCHO//2 + 170, 80, (50,50,50), size=16)
-                opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS"]
+                    pygame.draw.ellipse(self.screen, (255,255,255), (ANCHO//2 + 60, 40, 220, 60))
+                    self.mostrar_t(self.mascota.pensamiento, ANCHO//2 + 170, 60, (50,50,50), size=16)
+
+                opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS", "ARCADE"]
+                
+                # Lógica de interpolación para el menú (suavizado)
+                self.current_seleccion += (self.target_seleccion - self.current_seleccion) * 0.2
+                
                 for i, opt in enumerate(opts):
-                    c = (255,255,255) if self.seleccion == i else (140, 190, 210)
-                    pygame.draw.rect(self.screen, c, (40+i*185, 310, 165, 50), border_radius=15)
-                    self.mostrar_t(opt, 40+i*185+82, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=18)
-                if accion == "DERECHA": self.seleccion = (self.seleccion+1)%4
-                elif accion == "IZQUIERDA": self.seleccion = (self.seleccion-1)%4
+                    # Calculamos posición basada en la selección actual
+                    dist = i - self.current_seleccion
+                    x_pos = 400 + (dist * 160)
+                    y_pos = 320 + (abs(dist) * 20)
+                    escala = 1.0 - (min(abs(dist), 1) * 0.2)
+                    
+                    color = (255,255,255) if i == self.target_seleccion else (160, 160, 180)
+                    ancho_btn = 140 * escala
+                    alto_btn = 50 * escala
+                    
+                    btn_rect = pygame.Rect(x_pos - ancho_btn//2, y_pos, ancho_btn, alto_btn)
+                    
+                    # Brillo si está seleccionado
+                    if i == self.target_seleccion:
+                        for b in range(5):
+                            pygame.draw.rect(self.screen, (255,255,255, 50), btn_rect.inflate(b*4, b*4), border_radius=15, width=1)
+                    
+                    pygame.draw.rect(self.screen, color, btn_rect, border_radius=15)
+                    self.mostrar_t(opt, x_pos, y_pos + 12 * escala, (0,0,0), size=int(18*escala))
+
+                if accion == "DERECHA": self.target_seleccion = (self.target_seleccion + 1) % len(opts)
+                elif accion == "IZQUIERDA": self.target_seleccion = (self.target_seleccion - 1) % len(opts)
                 elif accion == "A": 
-                    self.modo = "SUB_" + opts[self.seleccion]
+                    self.modo = "SUB_" + opts[self.target_seleccion]
                     if self.modo == "SUB_CHISTES": self.obtener_nuevo_chiste()
+                    if self.modo == "SUB_ARCADE": self.arcade_roms = self.obtener_arcade_roms()
+
             elif self.modo == "SUB_MASCOTA":
                 spr = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=200)
                 self.screen.blit(spr, (ANCHO//2 - spr.get_width()//2, 20))
@@ -440,9 +507,11 @@ class BBotConsola:
                 elif accion == "A": self.mascota.is_sleeping = not self.mascota.is_sleeping
                 elif accion == "L": self.mascota.training = min(100, self.mascota.training + 10)
                 elif accion == "R" and self.mascota.is_sick: self.mascota.is_sick = False
+
             elif self.modo == "EN_JUEGO":
                 if self.juego.actualizar(accion): self.modo = "SUB_JUGAR"
                 else: self.juego.dibujar(self.screen)
+            
             elif self.modo == "SUB_JUGAR":
                 jgs = ["NAVES", "CARROS", "PACMAN"]
                 for i, j in enumerate(jgs):
@@ -456,29 +525,46 @@ class BBotConsola:
                     if self.sel_juego == 0: self.juego = JuegoNaves()
                     elif self.sel_juego == 1: self.juego = JuegoCarreras()
                     else: self.juego = JuegoPacman()
+
             elif self.modo == "SUB_CHISTES":
                 pygame.draw.rect(self.screen, (255,255,255), (100, 100, 600, 200), border_radius=15)
                 self.mostrar_t(self.chiste_actual["setup"], 400, 140, (0,0,0), 18)
                 self.mostrar_t(self.chiste_actual["punch"], 400, 220, (200,0,0), 22)
                 if accion == "A": self.obtener_nuevo_chiste()
+
             elif self.modo == "SUB_CUENTOS":
-                try:
-                    archs = sorted([f for f in os.listdir(self.tales_dir) if f.endswith('.txt')])
-                    if not archs: self.mostrar_t("Crea archivos .txt en /tales", 400, 200, (0,0,0), 18)
-                    else:
-                        for i, n in enumerate(archs[:6]):
-                            bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
-                            pygame.draw.rect(self.screen, bg, (100, 90 + i*45, 600, 40), border_radius=10)
-                            self.mostrar_t(n.replace(".txt", ""), 400, 98 + i*45, (255,255,255), 20)
-                        if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(archs)
-                        elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(archs)
-                        elif accion == "A":
-                            with open(os.path.join(self.tales_dir, archs[self.idx_cuento]), 'r', encoding='utf-8') as f:
-                                tx = f.read()
-                                f_c = pygame.font.SysFont(FUENTE_RETRO, 20)
-                                self.paginas_cuento = [self.wrap_mejorado(tx, f_c, 390)[i:i+9] for i in range(0, 1000, 9) if i < len(self.wrap_mejorado(tx, f_c, 390))]
-                            self.pagina_actual = 0; self.modo = "LEYENDO_CUENTO"
-                except: self.mostrar_t("Error en /tales", 400, 200, (255,0,0), 18)
+                archs = sorted([f for f in os.listdir(self.tales_dir) if f.endswith('.txt')])
+                if not archs: self.mostrar_t("Crea archivos .txt en /tales", 400, 200, (0,0,0), 18)
+                else:
+                    for i, n in enumerate(archs[:6]):
+                        bg = (0, 80, 200) if self.idx_cuento == i else (160, 200, 220)
+                        pygame.draw.rect(self.screen, bg, (100, 90 + i*45, 600, 40), border_radius=10)
+                        self.mostrar_t(n.replace(".txt", ""), 400, 98 + i*45, (255,255,255), 20)
+                    if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(archs)
+                    elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(archs)
+                    elif accion == "A":
+                        with open(os.path.join(self.tales_dir, archs[self.idx_cuento]), 'r', encoding='utf-8') as f:
+                            tx = f.read()
+                            f_c = pygame.font.SysFont(FUENTE_RETRO, 20)
+                            self.paginas_cuento = [self.wrap_mejorado(tx, f_c, 390)[i:i+9] for i in range(0, 1000, 9) if i < len(self.wrap_mejorado(tx, f_c, 390))]
+                        self.pagina_actual = 0; self.modo = "LEYENDO_CUENTO"
+
+            elif self.modo == "SUB_ARCADE":
+                # --- MENÚ ARCADE AUTO-DETECT ---
+                self.mostrar_t("MÁQUINA ARCADE DE PABLO", y=30, color=(0,0,0), size=24)
+                if not self.arcade_roms:
+                    self.mostrar_t("No hay juegos en RetroPie roms", 400, 200, (200,0,0), 18)
+                else:
+                    for i, rom in enumerate(self.arcade_roms[self.idx_cuento:self.idx_cuento+5]):
+                        bg = (255, 100, 0) if (i + self.idx_cuento) == self.idx_cuento else (255, 200, 100)
+                        pygame.draw.rect(self.screen, bg, (150, 80 + i*55, 500, 45), border_radius=12)
+                        self.mostrar_t(rom.replace(".zip", ""), 400, 90 + i*55, (0,0,0), 18)
+                    
+                    if accion == "ABAJO": self.idx_cuento = (self.idx_cuento + 1) % len(self.arcade_roms)
+                    elif accion == "ARRIBA": self.idx_cuento = (self.idx_cuento - 1) % len(self.arcade_roms)
+                    elif accion == "A":
+                        self.lanzar_arcade(self.arcade_roms[self.idx_cuento])
+
             elif self.modo == "LEYENDO_CUENTO":
                 spr = self.sprite_manager.get_sprite("leyendo", size=180)
                 self.screen.blit(spr, (50, 100))
@@ -488,6 +574,7 @@ class BBotConsola:
                         self.screen.blit(pygame.font.SysFont(FUENTE_RETRO, 20).render(lin, True, (30,30,30)), (345, 85 + i*28))
                 if accion in ["DERECHA", "A"] and self.pagina_actual < len(self.paginas_cuento)-1: self.pagina_actual += 1
                 elif accion == "IZQUIERDA" and self.pagina_actual > 0: self.pagina_actual -= 1
+
             pygame.display.flip(); self.clock.tick(60)
 
     def dibujar_barra(self, x, y, nom, val, col):
