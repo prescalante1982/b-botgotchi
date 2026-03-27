@@ -15,7 +15,7 @@ SPRITE_SHEET = "bbot_sprite_sheet.PNG"
 JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
-# --- RUTA PICO-8 (Verificada con tu 'ls') ---
+# --- RUTAS CORREGIDAS (Basadas en tu comando 'ls') ---
 PICO8_FOLDER = "/home/pi/Pico-8"
 PICO8_PATH = "/home/pi/Pico-8/pico8"
 
@@ -66,8 +66,8 @@ class WeatherManager:
 
     def obtener_fondo(self):
         if self.es_noche: return (15, 15, 45)
-        climas = {"Clear": (135, 206, 235), "Clouds": (160, 175, 190), "Rain": (75, 85, 95), "Snow": (220, 230, 240)}
-        return climas.get(self.clima_actual, (173, 216, 230))
+        clim = {"Clear": (135, 206, 235), "Clouds": (160, 175, 190), "Rain": (75, 85, 95), "Snow": (220, 230, 240)}
+        return clim.get(self.clima_actual, (173, 216, 230))
 
 # ==========================================
 # LÓGICA DE MASCOTA
@@ -96,7 +96,6 @@ class BBotPet:
         self.is_sleeping = self.is_sick = False
         self.last_tick = pygame.time.get_ticks()
         self.pensamiento = "¡Hola, Pablo!"
-        
         self.chistes_esp = [
             {"s": "¿Qué le dice un jaguar a otro?", "p": "¡Jaguar you!"},
             {"s": "¿Por qué el libro de mates está triste?", "p": "Muchos problemas."},
@@ -107,41 +106,7 @@ class BBotPet:
             {"s": "¿Qué le dice el 1 al 10?", "p": "Para ser como yo, tienes que ser sincero."},
             {"s": "¿Cuál es el animal que más dientes tiene?", "p": "¡El Ratoncito Pérez!"},
             {"s": "¿Cómo se dice 'perro' en inglés?", "p": "Dog. ¿Y 'veterinario'? ¡Dog-tor!"},
-            {"s": "¿Por qué las focas siempre miran hacia arriba?", "p": "¡Porque ahí están los focos!"},
             {"s": "¿Qué hace un perro con un taladro?", "p": "¡Está b-adrando!"},
-            {"s": "¿Qué le dice una pared a otra?", "p": "¡Nos vemos en la esquina!"},
-            {"s": "¿Por qué los pájaros vuelan hacia el sur en invierno?", "p": "¡Porque caminando tardarían mucho!"},
-            {"s": "¿Cómo se llama el primo vegetariano de Bruce Lee?", "p": "¡Broco-Lee!"},
-            {"s": "¿Qué hace una impresora en el mar?", "p": "¡Sacando copias del fondo!"},
-            {"s": "¿Cuál es el colmo de un robot?", "p": "¡Tener nervios de acero!"},
-            {"s": "¿Qué le dice un semáforo a otro?", "p": "¡No me mires, que me estoy cambiando!"},
-            {"s": "¿Cómo se dice 'disparar' en árabe?", "p": "Ahí-va-la-bala."},
-            {"s": "¿Qué hace una caja en el gimnasio?", "p": "¡Se hace caja fuerte!"},
-            {"s": "¿Cuál es el animal que es dos veces animal?", "p": "El gato, porque es gato y araña."},
-            {"s": "¿Por qué el ordenador fue al médico?", "p": "¡Porque tenía un virus!"},
-            {"s": "¿Cuál es el postre favorito de los magos?", "p": "¡El flan... tástico!"},
-            {"s": "¿Qué hace una vaca con los ojos cerrados?", "p": "¡Leche concentrada!"},
-            {"s": "¿Cómo se llama el campeón de buceo japonés?", "p": "Tokofondo."},
-            {"s": "¿Qué le dijo un cable a otro cable?", "p": "¡Somos intocables!"},
-            {"s": "¿Qué le dice un pato a otro?", "p": "¡Estamos empatados!"},
-            {"s": "¿Cómo se dice 'perro' en chino?", "p": "Chu-moko."},
-            {"s": "¿Qué le dice el café a la leche?", "p": "¡Nos vemos en el desayuno!"},
-            {"s": "¿Cuál es el baile favorito del canguro?", "p": "¡El hip-hop!"},
-            {"s": "¿Qué hace una abeja en el espejo?", "p": "¡Se está viendo bee-lla!"},
-            {"s": "¿Por qué el ordenador fue a la playa?", "p": "¡Para navegar por internet!"},
-            {"s": "¿Qué le dice una uva verde a una morada?", "p": "¡Respira, respira!"},
-            {"s": "¿Cuál es el colmo de un astronauta?", "p": "¡Tener un hijo que sea un sol!"},
-            {"s": "¿Qué hace una rata con una cámara?", "p": "¡Saca-rratas!"},
-            {"s": "¿Cómo se dice 'pobre' en japonés?", "p": "Nitungas nifaltas."},
-            {"s": "¿Qué le dice un ojo al otro?", "p": "¡Tan cerca y no nos vemos!"},
-            {"s": "¿Cuál es el animal que más vuela?", "p": "¡La mosca, porque vuela hasta cuando duerme!"},
-            {"s": "¿Por qué el tomate no fue al baile?", "p": "¡Porque no tenía salsa!"},
-            {"s": "¿Qué le dice un globo a otro?", "p": "¡Cuidado con el cactus!"},
-            {"s": "¿Cómo se dice 'espejo' en chino?", "p": "Aito-yo."},
-            {"s": "¿Qué hace un mudo en el gimnasio?", "p": "¡Pesas en silencio!"},
-            {"s": "¿Cuál es el colmo de un jardinero?", "p": "¡Que su novia se llame Rosa y lo deje plantado!"},
-            {"s": "¿Qué le dice una pulga a otra?", "p": "¿Vamos a pie o esperamos al perro?"},
-            {"s": "¿Cómo se dice 'trueno' en árabe?", "p": "Ahí-va-la-bomba."},
             {"s": "¿Qué hace un árbol con un teléfono?", "p": "¡Llamadas de madera!"}
         ]
 
@@ -179,13 +144,11 @@ class JuegoNaves:
         if self.timer_msg > 0: self.timer_msg -= 1; return False
         if accion == "IZQUIERDA": self.x = max(30, self.x - 20)
         elif accion == "DERECHA": self.x = min(770, self.x + 20)
-        elif accion == "X" or accion == "A": self.balas.append([self.x, 340])
-        
+        elif accion in ["X", "A"]: self.balas.append([self.x, 340])
         if random.random() < 0.08: self.enemigos.append([random.randint(50,750), -40])
         for b in self.balas[:]:
             b[1] -= 15
             if b[1] < 0: self.balas.remove(b)
-        
         for e in self.enemigos[:]:
             e[1] += (5 + self.puntos//200)
             if e[1] > 330 and abs(e[0]-self.x) < 40:
@@ -198,7 +161,6 @@ class JuegoNaves:
                     if b in self.balas: self.balas.remove(b)
                     self.puntos += 10; break
             if e[1] > 400: self.enemigos.remove(e)
-        
         if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "¡VIDA EXTRA!"; self.timer_msg = 45
         return False
 
@@ -254,16 +216,10 @@ class JuegoCarreras:
         for i in range(-100, 500, 100): pygame.draw.rect(sc, (255,255,255), (396, i + offset, 8, 50))
         pygame.draw.rect(sc, (30,30,30), (self.x-23, 318, 46, 45), border_radius=4)
         pygame.draw.rect(sc, (50, 120, 255), (self.x-20, 310, 40, 60), border_radius=10)
-        pygame.draw.rect(sc, (180,230,255), (self.x-15, 320, 30, 15), border_radius=4)
         for o in self.obs:
-            pygame.draw.rect(sc, (30,30,30), (o[0]-23, o[1]+8, 46, 45), border_radius=4)
             pygame.draw.rect(sc, o[2], (o[0]-20, o[1], 40, 60), border_radius=10)
-            pygame.draw.rect(sc, (180,230,255), (o[0]-15, o[1]+10, 30, 15), border_radius=4)
         fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
-        sc.blit(fuente.render(f"META: {int(self.distancia)}/{self.meta}m | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
-        if self.timer_msg > 0:
-            txt = fuente.render(self.mensaje, True, (255, 255, 0))
-            sc.blit(txt, (400 - txt.get_width()//2, 200))
+        sc.blit(fuente.render(f"SCORE: {self.puntos} | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
 
 class JuegoPacman:
     def __init__(self):
@@ -289,17 +245,10 @@ class JuegoPacman:
         if 0 <= nx < 7 and 0 <= ny < 15 and self.mapa[nx][ny] == 0: self.px, self.py = nx, ny
         if [self.px, self.py] in self.pts:
             self.pts.remove([self.px, self.py]); self.puntos += 10
-            if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "+1 VIDA"; self.timer_msg = 45
         for f in self.fantasmas:
-            if pygame.time.get_ticks() % 12 == 0:
-                if f[0] < self.px: f[0] += 1
-                elif f[0] > self.px: f[0] -= 1
-                elif f[1] < self.py: f[1] += 1
-                elif f[1] > self.py: f[1] -= 1
             if f == [self.px, self.py]:
                 self.vidas -= 1; self.px, self.py = 1, 1
-                if self.vidas > 0: self.mensaje = f"QUEDAN {self.vidas} VIDAS"; self.timer_msg = 60
-                else: self.mensaje = "GAME OVER"; self.timer_msg = 120; return True
+                return self.vidas <= 0
         return len(self.pts) == 0
 
     def dibujar(self, sc):
@@ -309,16 +258,6 @@ class JuegoPacman:
                 if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0, 0, 200), (c*50+15, r*50+15, 20, 20), border_radius=5)
                 elif [r,c] in self.pts: pygame.draw.circle(sc, (255,220,150), (c*50+25, r*50+25), 4)
         pygame.draw.circle(sc, (255,255,0), (self.py*50+25, self.px*50+25), 18)
-        for f in self.fantasmas:
-            fx, fy = f[1]*50+25, f[0]*50+25
-            pygame.draw.rect(sc, (255, 0, 100), (fx-15, fy-15, 30, 30), border_top_left_radius=15, border_top_right_radius=15)
-            pygame.draw.circle(sc, (255,255,255), (fx-6, fy-5), 5)
-            pygame.draw.circle(sc, (255,255,255), (fx+6, fy-5), 5)
-        fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
-        sc.blit(fuente.render(f"SCORE: {self.puntos} | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
-        if self.timer_msg > 0:
-            txt = fuente.render(self.mensaje, True, (255, 255, 0))
-            sc.blit(txt, (400 - txt.get_width()//2, 180))
 
 # ==========================================
 # CONSOLA PRINCIPAL
@@ -351,36 +290,29 @@ class BBotConsola:
         self.rect_cuento = pygame.Rect(320, 55, 440, 285)
         self.seleccion = 0; self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0; self.paginas_cuento = []
 
-    # --- MÉTODO PARA LANZAR PICO-8 ---
-# --- MÉTODO PARA LANZAR PICO-8 (CORREGIDO) ---
     def lanzar_pico8(self):
-        # Coordenadas para centrar 384x384 en una pantalla de 800x400
-        x_pos = 208
-        y_pos = 8
+        # Coordenadas exactas para centrar en 800x400
+        x_pos, y_pos = 208, 8
         
-        # Usamos los flags con el formato =valor para evitar confusiones en los argumentos
+        # Flags corregidos para que no se confundan con nombres de archivos
         cmd = [
-            PICO8_PATH,
-            "-splore",
+            PICO8_PATH, 
+            "-splore", 
             "-windowed", "1",
-            "-width", "384",
+            "-width", "384", 
             "-height", "384",
-            "-x", str(x_pos),
-            "-y", str(y_pos)
+            "-x", str(x_pos), 
+            "-y", str(y_pos),
+            "-draw_rect", f"{x_pos},{y_pos},384,384"
         ]
         
-        # También podemos forzar el dibujado con -draw_rect
-        cmd.append("-draw_rect")
-        cmd.append(f"{x_pos},{y_pos},384,384")
-
         pygame.display.iconify() 
         try:
-            # Es VITAL el cwd para que cargue sus librerías internas
+            # Ejecutamos con cwd (carpeta de trabajo) para cargar pico8.dat
             subprocess.run(cmd, cwd=PICO8_FOLDER)
         except Exception as e:
-            print(f"Error al lanzar Arcade: {e}")
+            print(f"Error: {e}")
             
-        # Al cerrar PICO-8, regresamos al B-Bot
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
         self.modo = "MENU"
 
@@ -438,6 +370,7 @@ class BBotConsola:
             keys_raw = pygame.key.get_pressed()
             if keys_raw[pygame.K_c]: self.modo = "CONFIG"; self.idx_cfg = 0; self.controles = {}
             if accion == "SELECT": self.modo = "MENU"; self.juego = None
+            
             if self.modo == "CONFIG":
                 self.mostrar_t("MUEVE O PULSA EL MANDO", y=100, color=(0,0,0), size=30)
                 self.mostrar_t(f"BOTÓN PARA: {self.pasos_cfg[self.idx_cfg]}", y=220, color=(200,0,0), size=24)
@@ -448,11 +381,7 @@ class BBotConsola:
                 flo = math.sin(t * 0.005) * 12
                 spr = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=160 * lat)
                 self.screen.blit(spr, (ANCHO//2 - spr.get_width()//2, 100 + flo))
-                if not self.mascota.is_sleeping:
-                    pygame.draw.ellipse(self.screen, (255,255,255), (ANCHO//2 + 60, 60, 220, 60))
-                    self.mostrar_t(self.mascota.pensamiento, ANCHO//2 + 170, 80, (50,50,50), size=16)
                 
-                # --- ACTUALIZADO: AHORA HAY 5 OPCIONES ---
                 opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS", "ARCADE"]
                 for i, opt in enumerate(opts):
                     c = (255,255,255) if self.seleccion == i else (140, 190, 210)
@@ -468,8 +397,7 @@ class BBotConsola:
                     else:
                         self.modo = "SUB_" + opts[self.seleccion]
                         if self.modo == "SUB_CHISTES": self.obtener_nuevo_chiste()
-            
-            # --- ESTADOS SUB_... ---
+
             elif self.modo == "SUB_MASCOTA":
                 spr = self.sprite_manager.get_sprite(self.mascota.mood_expression(), size=200)
                 self.screen.blit(spr, (ANCHO//2 - spr.get_width()//2, 20))
