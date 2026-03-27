@@ -15,7 +15,7 @@ SPRITE_SHEET = "bbot_sprite_sheet.PNG"
 JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
-# --- RUTA PICO-8 (Verificada con tu terminal) ---
+# --- RUTA PICO-8 ---
 PICO8_FOLDER = "/home/pi/Pico-8"
 PICO8_PATH = "/home/pi/Pico-8/pico8"
 
@@ -46,8 +46,7 @@ class WeatherManager:
                 hora = time.localtime().tm_hour
                 self.es_noche = hora < 6 or hora > 18
                 self.ultimo_check = pygame.time.get_ticks()
-        except: 
-            pass
+        except: pass
         self.actualizando = False
 
     def actualizar(self):
@@ -165,7 +164,7 @@ class BBotPet:
         return "neutral"
 
 # ==========================================
-# JUEGOS MEJORADOS
+# JUEGOS INTERNOS COMPLETOS
 # ==========================================
 
 class JuegoNaves:
@@ -178,7 +177,7 @@ class JuegoNaves:
         if self.timer_msg > 0: self.timer_msg -= 1; return False
         if accion == "IZQUIERDA": self.x = max(30, self.x - 20)
         elif accion == "DERECHA": self.x = min(770, self.x + 20)
-        elif accion == "X" or accion == "A": self.balas.append([self.x, 340])
+        elif accion == "A" or accion == "X": self.balas.append([self.x, 340])
         
         if random.random() < 0.08: self.enemigos.append([random.randint(50,750), -40])
         for b in self.balas[:]:
@@ -197,7 +196,6 @@ class JuegoNaves:
                     if b in self.balas: self.balas.remove(b)
                     self.puntos += 10; break
             if e[1] > 400: self.enemigos.remove(e)
-        
         if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "¡VIDA EXTRA!"; self.timer_msg = 45
         return False
 
@@ -253,11 +251,8 @@ class JuegoCarreras:
         for i in range(-100, 500, 100): pygame.draw.rect(sc, (255,255,255), (396, i + offset, 8, 50))
         pygame.draw.rect(sc, (30,30,30), (self.x-23, 318, 46, 45), border_radius=4)
         pygame.draw.rect(sc, (50, 120, 255), (self.x-20, 310, 40, 60), border_radius=10)
-        pygame.draw.rect(sc, (180,230,255), (self.x-15, 320, 30, 15), border_radius=4)
         for o in self.obs:
-            pygame.draw.rect(sc, (30,30,30), (o[0]-23, o[1]+8, 46, 45), border_radius=4)
             pygame.draw.rect(sc, o[2], (o[0]-20, o[1], 40, 60), border_radius=10)
-            pygame.draw.rect(sc, (180,230,255), (o[0]-15, o[1]+10, 30, 15), border_radius=4)
         fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(fuente.render(f"META: {int(self.distancia)}/{self.meta}m | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
         if self.timer_msg > 0:
@@ -288,7 +283,6 @@ class JuegoPacman:
         if 0 <= nx < 7 and 0 <= ny < 15 and self.mapa[nx][ny] == 0: self.px, self.py = nx, ny
         if [self.px, self.py] in self.pts:
             self.pts.remove([self.px, self.py]); self.puntos += 10
-            if self.puntos >= self.next_extra: self.vidas += 1; self.next_extra += 100; self.mensaje = "+1 VIDA"; self.timer_msg = 45
         for f in self.fantasmas:
             if pygame.time.get_ticks() % 12 == 0:
                 if f[0] < self.px: f[0] += 1
@@ -307,15 +301,12 @@ class JuegoPacman:
             for c in range(15):
                 if self.mapa[r][c] == 1: pygame.draw.rect(sc, (0, 0, 200), (c*50+15, r*50+15, 20, 20), border_radius=5)
                 elif [r,c] in self.pts: pygame.draw.circle(sc, (255,220,150), (c*50+25, r*50+25), 4)
-        boca = abs(math.sin(pygame.time.get_ticks()*0.015)) * 25
         pygame.draw.circle(sc, (255,255,0), (self.py*50+25, self.px*50+25), 18)
         for f in self.fantasmas:
             fx, fy = f[1]*50+25, f[0]*50+25
             pygame.draw.rect(sc, (255, 0, 100), (fx-15, fy-15, 30, 30), border_top_left_radius=15, border_top_right_radius=15)
             pygame.draw.circle(sc, (255,255,255), (fx-6, fy-5), 5)
             pygame.draw.circle(sc, (255,255,255), (fx+6, fy-5), 5)
-            pygame.draw.circle(sc, (0,0,0), (fx-6, fy-5), 2)
-            pygame.draw.circle(sc, (0,0,0), (fx+6, fy-5), 2)
         fuente = pygame.font.SysFont(FUENTE_RETRO, 20, True)
         sc.blit(fuente.render(f"SCORE: {self.puntos} | VIDAS: {self.vidas}", True, (255,255,255)), (10, 10))
         if self.timer_msg > 0:
@@ -333,7 +324,6 @@ class BBotConsola:
         if pygame.joystick.get_count() > 0:
             self.joy = pygame.joystick.Joystick(0); self.joy.init()
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
-        pygame.display.set_caption("B-Bot Pro: Pablo Edition")
         pygame.mouse.set_visible(False)
         self.clock = pygame.time.Clock(); self.running = True; self.modo = "MENU"
         self.controles = {}
@@ -353,23 +343,18 @@ class BBotConsola:
         self.rect_cuento = pygame.Rect(320, 55, 440, 285)
         self.seleccion = 0; self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0; self.paginas_cuento = []
 
-    def lanzar_pico8(self):
-        # Flags fijos para centrado perfecto en 800x400
-        cmd = [
-            PICO8_PATH, 
-            "-splore", 
-            "-windowed", "1",
-            "-width", "384", 
-            "-height", "384",
-            "-x", "208", 
-            "-y", "8"
-        ]
-        pygame.display.iconify() 
+    def lanzar_pico8_externo(self):
+        cmd = [PICO8_PATH, "-splore", "-windowed", "0"]
+        self.screen.fill((0,0,0))
+        self.mostrar_t("ABRIENDO PICO-8...", y=200, size=30)
+        pygame.display.flip()
+        pygame.display.iconify()
         try:
-            subprocess.run(cmd, cwd=PICO8_FOLDER)
+            subprocess.run(cmd, cwd=PICO8_FOLDER, check=True)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error Arcade: {e}")
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
+        pygame.mouse.set_visible(False)
         self.modo = "MENU"
 
     def obtener_nuevo_chiste(self):
@@ -451,7 +436,7 @@ class BBotConsola:
                 if accion == "DERECHA": self.seleccion = (self.seleccion+1)%len(opts)
                 elif accion == "IZQUIERDA": self.seleccion = (self.seleccion-1)%len(opts)
                 elif accion == "A": 
-                    if opts[self.seleccion] == "ARCADE": self.lanzar_pico8()
+                    if opts[self.seleccion] == "ARCADE": self.lanzar_pico8_externo()
                     else:
                         self.modo = "SUB_" + opts[self.seleccion]
                         if self.modo == "SUB_CHISTES": self.obtener_nuevo_chiste()
@@ -510,7 +495,7 @@ class BBotConsola:
             elif self.modo == "LEYENDO_CUENTO":
                 spr = self.sprite_manager.get_sprite("leyendo", size=180)
                 self.screen.blit(spr, (50, 100))
-                pygame.draw.rect(self.screen, (255, 255, 245), self.rect_cuento, border_radius=15)
+                pygame.draw.rect(self.screen, (255, 255, 245), pygame.Rect(320, 55, 440, 285), border_radius=15)
                 if self.paginas_cuento and self.pagina_actual < len(self.paginas_cuento):
                     for i, lin in enumerate(self.paginas_cuento[self.pagina_actual]):
                         self.screen.blit(pygame.font.SysFont(FUENTE_RETRO, 20).render(lin, True, (30,30,30)), (345, 85 + i*28))
