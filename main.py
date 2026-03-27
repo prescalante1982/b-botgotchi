@@ -6,7 +6,7 @@ import math
 import random
 import requests
 import threading
-import subprocess  # Necesario para lanzar PICO-8
+import subprocess
 
 # --- CONFIGURACIÓN ---
 ANCHO, ALTO = 800, 400
@@ -15,8 +15,9 @@ SPRITE_SHEET = "bbot_sprite_sheet.PNG"
 JSON_CONFIG = "bbot_mascota.json"
 FUENTE_RETRO = "Courier New"
 
-# RUTA PICO-8 (Ajusta si tu carpeta tiene otro nombre)
-PICO8_PATH = "/home/pi/pico8/pico8"
+# --- RUTA PICO-8 (Verificada con tu 'ls') ---
+PICO8_FOLDER = "/home/pi/Pico-8"
+PICO8_PATH = "/home/pi/Pico-8/pico8"
 
 API_KEY_WEATHER = "2f9b383d006c73b7d2d11226c5fdd10d"
 CIUDAD = "Guatemala City"
@@ -103,9 +104,44 @@ class BBotPet:
             {"s": "¿Cómo se dice pañuelo en japonés?", "p": "Saca-moko."},
             {"s": "¿Cuál es el baile del tomate?", "p": "¡La salsa!"},
             {"s": "¿Qué le dice un pez a otro?", "p": "¡Nada!"},
+            {"s": "¿Qué le dice el 1 al 10?", "p": "Para ser como yo, tienes que ser sincero."},
+            {"s": "¿Cuál es el animal que más dientes tiene?", "p": "¡El Ratoncito Pérez!"},
+            {"s": "¿Cómo se dice 'perro' en inglés?", "p": "Dog. ¿Y 'veterinario'? ¡Dog-tor!"},
+            {"s": "¿Por qué las focas siempre miran hacia arriba?", "p": "¡Porque ahí están los focos!"},
             {"s": "¿Qué hace un perro con un taladro?", "p": "¡Está b-adrando!"},
+            {"s": "¿Qué le dice una pared a otra?", "p": "¡Nos vemos en la esquina!"},
+            {"s": "¿Por qué los pájaros vuelan hacia el sur en invierno?", "p": "¡Porque caminando tardarían mucho!"},
+            {"s": "¿Cómo se llama el primo vegetariano de Bruce Lee?", "p": "¡Broco-Lee!"},
+            {"s": "¿Qué hace una impresora en el mar?", "p": "¡Sacando copias del fondo!"},
             {"s": "¿Cuál es el colmo de un robot?", "p": "¡Tener nervios de acero!"},
             {"s": "¿Qué le dice un semáforo a otro?", "p": "¡No me mires, que me estoy cambiando!"},
+            {"s": "¿Cómo se dice 'disparar' en árabe?", "p": "Ahí-va-la-bala."},
+            {"s": "¿Qué hace una caja en el gimnasio?", "p": "¡Se hace caja fuerte!"},
+            {"s": "¿Cuál es el animal que es dos veces animal?", "p": "El gato, porque es gato y araña."},
+            {"s": "¿Por qué el ordenador fue al médico?", "p": "¡Porque tenía un virus!"},
+            {"s": "¿Cuál es el postre favorito de los magos?", "p": "¡El flan... tástico!"},
+            {"s": "¿Qué hace una vaca con los ojos cerrados?", "p": "¡Leche concentrada!"},
+            {"s": "¿Cómo se llama el campeón de buceo japonés?", "p": "Tokofondo."},
+            {"s": "¿Qué le dijo un cable a otro cable?", "p": "¡Somos intocables!"},
+            {"s": "¿Qué le dice un pato a otro?", "p": "¡Estamos empatados!"},
+            {"s": "¿Cómo se dice 'perro' en chino?", "p": "Chu-moko."},
+            {"s": "¿Qué le dice el café a la leche?", "p": "¡Nos vemos en el desayuno!"},
+            {"s": "¿Cuál es el baile favorito del canguro?", "p": "¡El hip-hop!"},
+            {"s": "¿Qué hace una abeja en el espejo?", "p": "¡Se está viendo bee-lla!"},
+            {"s": "¿Por qué el ordenador fue a la playa?", "p": "¡Para navegar por internet!"},
+            {"s": "¿Qué le dice una uva verde a una morada?", "p": "¡Respira, respira!"},
+            {"s": "¿Cuál es el colmo de un astronauta?", "p": "¡Tener un hijo que sea un sol!"},
+            {"s": "¿Qué hace una rata con una cámara?", "p": "¡Saca-rratas!"},
+            {"s": "¿Cómo se dice 'pobre' en japonés?", "p": "Nitungas nifaltas."},
+            {"s": "¿Qué le dice un ojo al otro?", "p": "¡Tan cerca y no nos vemos!"},
+            {"s": "¿Cuál es el animal que más vuela?", "p": "¡La mosca, porque vuela hasta cuando duerme!"},
+            {"s": "¿Por qué el tomate no fue al baile?", "p": "¡Porque no tenía salsa!"},
+            {"s": "¿Qué le dice un globo a otro?", "p": "¡Cuidado con el cactus!"},
+            {"s": "¿Cómo se dice 'espejo' en chino?", "p": "Aito-yo."},
+            {"s": "¿Qué hace un mudo en el gimnasio?", "p": "¡Pesas en silencio!"},
+            {"s": "¿Cuál es el colmo de un jardinero?", "p": "¡Que su novia se llame Rosa y lo deje plantado!"},
+            {"s": "¿Qué le dice una pulga a otra?", "p": "¿Vamos a pie o esperamos al perro?"},
+            {"s": "¿Cómo se dice 'trueno' en árabe?", "p": "Ahí-va-la-bomba."},
             {"s": "¿Qué hace un árbol con un teléfono?", "p": "¡Llamadas de madera!"}
         ]
 
@@ -317,7 +353,7 @@ class BBotConsola:
 
     # --- MÉTODO PARA LANZAR PICO-8 ---
     def lanzar_pico8(self):
-        # Calculamos centrado: X=(800-384)//2 = 208, Y=(400-384)//2 = 8
+        # Centrado: X=(800-384)//2 = 208, Y=(400-384)//2 = 8
         x_off, y_off = 208, 8
         cmd = [
             PICO8_PATH, "-splore", "-windowed", "1",
@@ -325,9 +361,10 @@ class BBotConsola:
             "-x", str(x_off), "-y", str(y_off),
             "-draw_rect", f"{x_off},{y_off},384,384"
         ]
-        pygame.display.iconify() # Minimiza para evitar bugs de ventana
+        pygame.display.iconify() 
         try:
-            subprocess.run(cmd)
+            # cwd asegura que encuentre pico8.dat en su carpeta
+            subprocess.run(cmd, cwd=PICO8_FOLDER)
         except Exception as e:
             print(f"Error: {e}")
         # Al volver, reiniciamos la ventana de Pygame
@@ -406,7 +443,6 @@ class BBotConsola:
                 opts = ["JUGAR", "MASCOTA", "CHISTES", "CUENTOS", "ARCADE"]
                 for i, opt in enumerate(opts):
                     c = (255,255,255) if self.seleccion == i else (140, 190, 210)
-                    # Ajuste de posición para que quepan 5 botones (un poco más pequeños)
                     x_btn = 15 + i*158 
                     pygame.draw.rect(self.screen, c, (x_btn, 310, 145, 50), border_radius=15)
                     self.mostrar_t(opt, x_btn+72, 322, (0,0,0) if self.seleccion==i else (255,255,255), size=16)
