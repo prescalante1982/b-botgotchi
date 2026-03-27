@@ -352,22 +352,35 @@ class BBotConsola:
         self.seleccion = 0; self.sel_juego = 0; self.idx_cuento = 0; self.pagina_actual = 0; self.paginas_cuento = []
 
     # --- MÉTODO PARA LANZAR PICO-8 ---
+# --- MÉTODO PARA LANZAR PICO-8 (CORREGIDO) ---
     def lanzar_pico8(self):
-        # Centrado: X=(800-384)//2 = 208, Y=(400-384)//2 = 8
-        x_off, y_off = 208, 8
+        # Coordenadas para centrar 384x384 en una pantalla de 800x400
+        x_pos = 208
+        y_pos = 8
+        
+        # Usamos los flags con el formato =valor para evitar confusiones en los argumentos
         cmd = [
-            PICO8_PATH, "-splore", "-windowed", "1",
-            "-width", "384", "-height", "384",
-            "-x", str(x_off), "-y", str(y_off),
-            "-draw_rect", f"{x_off},{y_off},384,384"
+            PICO8_PATH,
+            "-splore",
+            "-windowed", "1",
+            "-width", "384",
+            "-height", "384",
+            "-x", str(x_pos),
+            "-y", str(y_pos)
         ]
+        
+        # También podemos forzar el dibujado con -draw_rect
+        cmd.append("-draw_rect")
+        cmd.append(f"{x_pos},{y_pos},384,384")
+
         pygame.display.iconify() 
         try:
-            # cwd asegura que encuentre pico8.dat en su carpeta
+            # Es VITAL el cwd para que cargue sus librerías internas
             subprocess.run(cmd, cwd=PICO8_FOLDER)
         except Exception as e:
-            print(f"Error: {e}")
-        # Al volver, reiniciamos la ventana de Pygame
+            print(f"Error al lanzar Arcade: {e}")
+            
+        # Al cerrar PICO-8, regresamos al B-Bot
         self.screen = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED)
         self.modo = "MENU"
 
